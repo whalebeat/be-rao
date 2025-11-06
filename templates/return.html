@@ -11,17 +11,17 @@
             <option value="">-- Chọn Giải chạy --</option>
             {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
           </select>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button>
+          <!-- <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button> -->
         </div>
       </div>
       <div class="col-md-4">
         <label class="form-label">Trạm</label>
         <div class="input-group">
-          <select name="station" id="station-select-return" class="form-select">
-            <option value="">-- Chọn tên Trạm (optional) --</option>
-            {% for s in stations %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          <select name="station" id="station-select-return" class="form-select" onchange="onStationChange()">
+            <option value="">-- Chọn Trạm --</option>
+            {% for s in stations %}<option value="{{ s.id }}" {% if selected_station and selected_station==s.id|string %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
           </select>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addStationModal">Add</button>
+          <!-- <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addStationModal">Add</button> -->
         </div>
       </div>
       <div class="col-md-4">

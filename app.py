@@ -144,12 +144,16 @@ def return_equipment():
     equipments = Equipment.query.order_by(Equipment.name).all()
     persons = Person.query.order_by(Person.name).all()
     marathon_id = request.args.get('marathon') or None
+    selected_station_id = request.args.get('station') or None
     unreturned = []
     if marathon_id:
         from sqlalchemy import func
         issued_q = db.session.query(IssueRecord.station_id, IssueRecord.equipment_id, func.sum(IssueRecord.quantity).label('issued')).filter(IssueRecord.marathon_id==marathon_id).group_by(IssueRecord.station_id, IssueRecord.equipment_id).subquery()
         returned_q = db.session.query(ReturnRecord.station_id, ReturnRecord.equipment_id, func.sum(ReturnRecord.quantity).label('returned')).filter(ReturnRecord.marathon_id==marathon_id).group_by(ReturnRecord.station_id, ReturnRecord.equipment_id).subquery()
-        rows = db.session.query(issued_q.c.station_id, issued_q.c.equipment_id, issued_q.c.issued, returned_q.c.returned).outerjoin(returned_q, (issued_q.c.station_id==returned_q.c.station_id)&(issued_q.c.equipment_id==returned_q.c.equipment_id)).all()
+        base_query = db.session.query(issued_q.c.station_id, issued_q.c.equipment_id, issued_q.c.issued, returned_q.c.returned).outerjoin(returned_q, (issued_q.c.station_id==returned_q.c.station_id)&(issued_q.c.equipment_id==returned_q.c.equipment_id))
+        if selected_station_id:
+            base_query = base_query.filter(issued_q.c.station_id == selected_station_id)
+        rows = base_query.all()
         for r in rows:
             returned = r.returned or 0
             if r.issued - returned > 0:
@@ -181,7 +185,9 @@ def return_equipment():
             db.session.add(r)
         db.session.commit()
         return redirect(url_for('return_equipment', marathon=marathon_id))
-    return render_template('return.html', marathons=marathons, stations=stations, equipments=equipments, persons=persons, unreturned=unreturned, selected_marathon=marathon_id, user=user)
+    return render_template('return.html', marathons=marathons, stations=stations, equipments=equipments, 
+                         persons=persons, unreturned=unreturned, selected_marathon=marathon_id, 
+                         selected_station=selected_station_id, user=user)
 
 @app.route('/report', methods=['GET'])
 @login_required

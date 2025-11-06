@@ -104,6 +104,72 @@ document.addEventListener('DOMContentLoaded', () => {
         const params = new URLSearchParams(window.location.search);
         if (marathon) params.set('marathon', marathon);
         else params.delete('marathon');
+        params.delete('station'); // Clear station filter when marathon changes
         window.location.search = params.toString();
     };
+
+    // Function to handle station selection change - maintains selection and updates list
+    window.onStationChange = function() {
+        const marathonSel = document.getElementById('marathon-select-return');
+        const stationSel = document.getElementById('station-select-return');
+        if (!marathonSel || !stationSel) return;
+        
+        const marathon = marathonSel.value;
+        const station = stationSel.value;
+        const selectedOption = stationSel.options[stationSel.selectedIndex];
+        
+        // Build query parameters
+        const params = new URLSearchParams(window.location.search);
+        if (marathon) params.set('marathon', marathon);
+        else params.delete('marathon');
+        
+        // Handle station - if not placeholder, include station param
+        if (station && selectedOption) {
+            params.set('station', station);
+        } else {
+            params.delete('station');
+        }
+        
+        window.location.search = params.toString();
+    };
+
+    // Return form submission handler
+    const returnForm = document.getElementById('return-form');
+    if (returnForm) {
+        returnForm.onsubmit = function(e) {
+            // Check if we should use the person selection or username
+            const personSelect = document.getElementById('person-select-return');
+            const newPersonInput = returnForm.querySelector('input[name="new_person"]');
+            if (personSelect && personSelect.value) {
+                newPersonInput.value = ''; // Clear new person if one was selected
+            }
+            
+            // If no station is selected but there's one unreturned item selected to return,
+            // use that item's station instead
+            const stationSelect = document.getElementById('station-select-return');
+            if (stationSelect && !stationSelect.value) {
+                const quantities = returnForm.querySelectorAll('input[name="quantity[]"]');
+                const stationCells = returnForm.querySelectorAll('#return-table tbody tr td:first-child');
+                let selectedStation = null;
+                
+                for (let i = 0; i < quantities.length; i++) {
+                    if (quantities[i].value > 0) {
+                        const stationName = stationCells[i].textContent.trim();
+                        if (stationName && stationName !== '—') {
+                            // Find matching station ID from select options
+                            for (const opt of stationSelect.options) {
+                                if (opt.textContent === stationName) {
+                                    stationSelect.value = opt.value;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            return true; // Allow form submission to continue
+        };
+    }
 });
