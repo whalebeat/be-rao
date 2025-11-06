@@ -29,9 +29,9 @@
         <div class="input-group">
           <select name="person" id="person-select-return" class="form-select">
             <option value="">-- Chọn người trả --</option>
-            {% for p in persons %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
+            {% for p in persons %}<option value="{{ p.name }}" {% if p.name == user.username %}selected{% endif %}>{{ p.name }}</option>{% endfor %}
           </select>
-          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới">
+          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới" value="{{ user.username if user.username not in persons|map(attribute='name')|list else '' }}">
         </div>
       </div>
     </div>

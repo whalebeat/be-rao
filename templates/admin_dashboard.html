@@ -3,7 +3,6 @@
 <div class="card p-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Bảng Điều Khiển Admin</h3>
-    <a href="{{ url_for('admin_logout') }}" class="btn btn-sm btn-outline-danger">Đăng Xuất</a>
   </div>
 
   <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
@@ -30,6 +29,7 @@
               <th>Tên</th>
               <th>Số lượng</th>
               <th>Người giao</th>
+              <th>Người tạo</th>
               <th>Thao tác</th>
             </tr>
           </thead>
@@ -43,6 +43,7 @@
               <td>{{ equipments|selectattr('id', 'equalto', record.equipment_id)|map(attribute='name')|first or '—' }}</td>
               <td>{{ record.quantity }}</td>
               <td>{{ record.person_name }}</td>
+              <td>{{ record.created_by or '—' }}</td>
               <td>
                 <div class="btn-group btn-group-sm">
                   <a href="{{ url_for('edit_issue_record', record_id=record.id) }}" class="btn btn-outline-primary">Sửa</a>
@@ -72,6 +73,7 @@
               <th>Tên</th>
               <th>Số lượng</th>
               <th>Người trả</th>
+              <th>Người tạo</th>
               <th>Thao tác</th>
             </tr>
           </thead>
@@ -85,6 +87,7 @@
               <td>{{ equipments|selectattr('id', 'equalto', record.equipment_id)|map(attribute='name')|first or '—' }}</td>
               <td>{{ record.quantity }}</td>
               <td>{{ record.person_name }}</td>
+              <td>{{ record.created_by or '—' }}</td>
               <td>
                 <div class="btn-group btn-group-sm">
                   <a href="{{ url_for('edit_return_record', record_id=record.id) }}" class="btn btn-outline-primary">Sửa</a>

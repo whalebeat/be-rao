@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <h2>👥 Quản Lý Người Dùng</h2>
+  
+  <div class="mb-3">
+    <a href="{{ url_for('admin_add_user') }}" class="btn btn-primary">➕ Thêm Người Dùng Mới</a>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Tên đăng nhập</th>
+        <th>Vai trò</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>
+          {% if u.role == 'admin' %}
+            <span class="badge bg-danger">Quản trị viên</span>
+          {% else %}
+            <span class="badge bg-primary">Người dùng</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('admin_reset_password', user_id=u.id) }}" class="btn btn-sm btn-warning">🔑 Đặt Lại Mật Khẩu</a>
+          {% if u.id != user.id %}
+          <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa người dùng {{ u.username }}?');">
+            <button type="submit" class="btn btn-sm btn-danger">🗑️ Xóa</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -18,15 +18,17 @@
             <small class="text-muted">Quản Lý Đồ Dùng/Thiết Bị</small>
           </div>
         </a>
-        <div>
-          <a class="btn btn-outline-primary me-2" href="{{ url_for('issue') }}">Giao Đồ</a>
-          <a class="btn btn-outline-secondary me-2" href="{{ url_for('return_equipment') }}">Trả Đồ</a>
-          <a class="btn btn-outline-success me-2" href="{{ url_for('report') }}">Báo Cáo</a>
-          {% if session.get('admin_logged_in') %}
-            <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">Admin</a>
-          {% else %}
-            <a class="btn btn-outline-dark" href="{{ url_for('admin_login') }}">Login</a>
+        <div class="d-flex gap-2">
+          <a class="btn btn-primary" href="{{ url_for('issue') }}">📦 Giao Đồ</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('return_equipment') }}">↩️ Trả Đồ</a>
+          <a class="btn btn-outline-success" href="{{ url_for('report') }}">📊 Xem Báo Cáo</a>
+          
+          {% if user.role == 'admin' %}
+          <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">⚙️ Quản Lý Hệ Thống</a>
+          <a class="btn btn-outline-info" href="{{ url_for('admin_users') }}">👥 Quản Lý Người Dùng</a>
           {% endif %}
+          
+          <a class="btn btn-outline-danger" href="{{ url_for('logout') }}">🚪 Đăng Xuất</a>
         </div>
       </div>
     </nav>

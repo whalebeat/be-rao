@@ -51,6 +51,7 @@
             <th>Tên</th>
             <th>Số lượng</th>
             <th>Người giao/trả</th>
+            <th>Người tạo</th>
           </tr>
         </thead>
         <tbody>
@@ -68,6 +69,7 @@
             <td>{{ t.equipment or '—' }}</td>
             <td>{{ t.quantity }}</td>
             <td>{{ t.person }}</td>
+            <td>{{ t.created_by or '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
