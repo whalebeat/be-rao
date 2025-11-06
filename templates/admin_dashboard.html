@@ -2,16 +2,16 @@
 {% block content %}
 <div class="card p-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>Admin Dashboard</h3>
-    <a href="{{ url_for('admin_logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+    <h3>Bảng Điều Khiển Admin</h3>
+    <a href="{{ url_for('admin_logout') }}" class="btn btn-sm btn-outline-danger">Đăng Xuất</a>
   </div>
 
   <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue-records" type="button">Issue Records</button>
+      <button class="nav-link active" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue-records" type="button">Lịch sử Giao đồ</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return-records" type="button">Return Records</button>
+      <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return-records" type="button">Lịch sử Trả đồ</button>
     </li>
   </ul>
 
