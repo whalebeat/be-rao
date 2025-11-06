@@ -23,12 +23,16 @@
           <a class="btn btn-outline-secondary" href="{{ url_for('return_equipment') }}">↩️ Trả Đồ</a>
           <a class="btn btn-outline-success" href="{{ url_for('report') }}">📊 Xem Báo Cáo</a>
           
-          {% if user.role == 'admin' %}
-          <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">⚙️ Quản Lý Hệ Thống</a>
-          <a class="btn btn-outline-info" href="{{ url_for('admin_users') }}">👥 Quản Lý Người Dùng</a>
+          {% if user and user.role == 'admin' %}
+            <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">⚙️ Quản Lý Hệ Thống</a>
+            <a class="btn btn-outline-info" href="{{ url_for('admin_users') }}">👥 Quản Lý Người Dùng</a>
           {% endif %}
-          
-          <a class="btn btn-outline-danger" href="{{ url_for('logout') }}">🚪 Đăng Xuất</a>
+
+          {% if session.get('user_id') %}
+            <a class="btn btn-outline-danger" href="{{ url_for('logout') }}">🚪 Đăng Xuất</a>
+          {% else %}
+            <a class="btn btn-outline-dark" href="{{ url_for('login') }}">🔐 Đăng Nhập</a>
+          {% endif %}
         </div>
       </div>
     </nav>
