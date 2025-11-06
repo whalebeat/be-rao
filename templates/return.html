@@ -1,45 +1,45 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card p-4">
-  <h3>Return Equipment</h3>
+  <h3>Trả Đồ</h3>
   <form method="post" id="return-form">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
-        <label class="form-label">Marathon</label>
+        <label class="form-label">Giải chạy</label>
         <div class="input-group">
           <select name="marathon" id="marathon-select-return" class="form-select" onchange="onMarathonChange()">
-            <option value="">-- Select Marathon --</option>
+            <option value="">-- Chọn Giải chạy --</option>
             {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
           </select>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Add</button>
+          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button>
         </div>
       </div>
       <div class="col-md-4">
-        <label class="form-label">Station</label>
+        <label class="form-label">Trạm</label>
         <div class="input-group">
           <select name="station" id="station-select-return" class="form-select">
-            <option value="">-- Select Station (optional) --</option>
+            <option value="">-- Chọn tên Trạm (optional) --</option>
             {% for s in stations %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
           </select>
           <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addStationModal">Add</button>
         </div>
       </div>
       <div class="col-md-4">
-        <label class="form-label">Returned by</label>
+        <label class="form-label">Người trả</label>
         <div class="input-group">
           <select name="person" id="person-select-return" class="form-select">
-            <option value="">-- Select Person --</option>
+            <option value="">-- Chọn người trả --</option>
             {% for p in persons %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
           </select>
-          <input class="form-control" name="new_person" placeholder="Or enter new person">
+          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới">
         </div>
       </div>
     </div>
 
-    <h5>Unreturned items</h5>
+    <h5>Đồ chưa trả</h5>
     {% if unreturned %}
       <table class="table" id="return-table">
-        <thead><tr><th>Station</th><th>Equipment</th><th>Missing</th><th>Return qty</th></tr></thead>
+        <thead><tr><th>Trạm</th><th>Tên</th><th>Số lượng còn thiếu</th><th>Số lượng trả</th></tr></thead>
         <tbody>
           {% for it in unreturned %}
           <tr>
@@ -52,10 +52,10 @@
         </tbody>
       </table>
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Submit Returns</button>
+        <button type="submit" class="btn btn-primary">Lưu</button>
       </div>
     {% else %}
-      <p class="text-muted">Select a marathon to see unreturned items.</p>
+      <p class="text-muted">Chọn Giải chạy để xem đồ cần trả.</p>
     {% endif %}
   </form>
 </div>

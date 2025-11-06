@@ -1,88 +1,88 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card p-4">
-  <h3>Issue Equipment</h3>
+  <h3>Giao Đồ</h3>
   <form method="post" id="issue-form">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
-        <label class="form-label">Marathon</label>
+        <label class="form-label">Giải chạy</label>
         <div class="input-group">
           <select name="marathon" id="marathon-select" class="form-select">
-            <option value="">-- Select Marathon --</option>
+            <option value="">-- Chọn Giải chạy --</option>
             {% for m in marathons %}
               <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}
           </select>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Add</button>
+          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button>
         </div>
       </div>
       <div class="col-md-4">
-        <label class="form-label">Station</label>
+        <label class="form-label">Trạm</label>
         <div class="input-group">
           <select name="station" id="station-select" class="form-select">
-            <option value="">-- Select Station --</option>
+            <option value="">-- Chọn tên Trạm --</option>
             {% for s in stations %}
               <option value="{{ s.id }}">{{ s.name }}</option>
             {% endfor %}
           </select>
-          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addStationModal">Add</button>
+          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addStationModal">Thêm</button>
         </div>
       </div>
       <div class="col-md-4">
-        <label class="form-label">Issued by</label>
+        <label class="form-label">Người giao</label>
         <div class="input-group">
           <select name="person" id="person-select" class="form-select">
-            <option value="">-- Select Person --</option>
+            <option value="">-- Chọn người giao --</option>
             {% for p in persons %}
               <option value="{{ p.name }}">{{ p.name }}</option>
             {% endfor %}
           </select>
-          <input class="form-control" name="new_person" placeholder="Or enter new person">
+          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới">
         </div>
       </div>
     </div>
 
-    <h5>Equipment list</h5>
+    <h5>Danh sách</h5>
     <table class="table" id="equipment-table">
-      <thead><tr><th>Equipment</th><th>New equipment</th><th>Quantity</th><th></th></tr></thead>
+      <thead><tr><th>Tên</th><th>Thêm tên mới (nếu chưa có)</th><th>Số lượng</th><th></th></tr></thead>
       <tbody>
         <tr class="item-row">
           <td>
             <select name="equipment[]" class="form-select">
-              <option value="">-- Select --</option>
+              <option value="">-- Chọn --</option>
               {% for e in equipments %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
             </select>
           </td>
-          <td><input name="new_equipment[]" class="form-control" placeholder="Optional: add new equipment"></td>
+          <td><input name="new_equipment[]" class="form-control" placeholder="Tùy chọn: Thêm tên mới"></td>
           <td><input name="quantity[]" type="number" min="1" class="form-control" value="1"></td>
           <td><button type="button" class="btn btn-sm btn-danger remove-row">X</button></td>
         </tr>
       </tbody>
     </table>
     <div class="d-flex gap-2">
-      <button type="button" id="add-row" class="btn btn-sm btn-outline-primary">+ Add row</button>
-      <button type="submit" class="btn btn-primary">Submit Issue</button>
+      <button type="button" id="add-row" class="btn btn-sm btn-outline-primary">+ Thêm hàng mới</button>
+      <button type="submit" class="btn btn-primary">Lưu</button>
     </div>
   </form>
 </div>
 
 <!-- Modals -->
 <div class="modal fade" id="addMarathonModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">Add Marathon</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body"><input id="new-marathon-name" class="form-control" placeholder="Marathon name or ID"></div>
-  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button id="save-marathon" class="btn btn-primary">Save</button></div>
+  <div class="modal-header"><h5 class="modal-title">Thêm giải chạy</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input id="new-marathon-name" class="form-control" placeholder="Tên Giải chạy"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button id="save-marathon" class="btn btn-primary">Save</button></div>
 </div></div></div>
 
 <div class="modal fade" id="addStationModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">Add Station</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body"><input id="new-station-name" class="form-control" placeholder="Station name"></div>
-  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button id="save-station" class="btn btn-primary">Save</button></div>
+  <div class="modal-header"><h5 class="modal-title">Thêm trạm</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input id="new-station-name" class="form-control" placeholder="Tên Trạm"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button id="save-station" class="btn btn-primary">Save</button></div>
 </div></div></div>
 
 <div class="modal fade" id="addEquipmentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">Add Equipment</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body"><input id="new-equipment-name" class="form-control" placeholder="Equipment name"></div>
-  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button id="save-equipment" class="btn btn-primary">Save</button></div>
+  <div class="modal-header"><h5 class="modal-title">Thêm đồ</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input id="new-equipment-name" class="form-control" placeholder="Tên mới"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button id="save-equipment" class="btn btn-primary">Save</button></div>
 </div></div></div>
 
 {% endblock %}

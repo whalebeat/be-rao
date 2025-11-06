@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card p-4">
-  <h3>Reports</h3>
+  <h3>Báo Cáo</h3>
   <div class="mb-3">
     <div class="row g-2">
       <div class="col-md-6">
-        <label class="form-label">Marathon</label>
+        <label class="form-label">Giải chạy</label>
         <select name="marathon" id="report-marathon-select" class="form-select" onchange="onReportMarathonChange()">
-          <option value="">-- Select Marathon --</option>
+          <option value="">-- Chọn Giải chạy --</option>
           {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
         </select>
       </div>
@@ -15,9 +15,9 @@
   </div>
 
   {% if selected_marathon %}
-    <h5>Equipment summary</h5>
+    <h5>Thống kê</h5>
     <table class="table">
-      <thead><tr><th>Equipment</th><th>Issued</th><th>Returned</th><th>Remaining</th></tr></thead>
+      <thead><tr><th>Tên</th><th>Đã giao</th><th>Đã trả</th><th>Còn thiếu</th></tr></thead>
       <tbody>
         {% for r in equipment_summary %}
         <tr {% if r.remaining>0 %}class="table-warning"{% endif %}>
@@ -27,7 +27,7 @@
       </tbody>
     </table>
 
-    <h5>Missing by station</h5>
+    <h5>Số lượng còn thiếu theo từng Trạm</h5>
     {% if station_details %}
       {% for st in station_details %}
         <div class="mb-2"><strong>{{ st.station }}</strong>
@@ -37,20 +37,20 @@
         </div>
       {% endfor %}
     {% else %}
-      <p>No missing items for this marathon.</p>
+      <p>Đã trả đủ đồ.</p>
     {% endif %}
 
-    <h5 class="mt-4">Transaction History</h5>
+    <h5 class="mt-4">Lịch sử Giao/Trả</h5>
     {% if transactions %}
       <table class="table table-sm">
         <thead>
           <tr>
-            <th>Type</th>
-            <th>Date/Time</th>
-            <th>Station</th>
-            <th>Equipment</th>
-            <th>Quantity</th>
-            <th>Person</th>
+            <th>Loại</th>
+            <th>Thời gian</th>
+            <th>Trạm</th>
+            <th>Tên</th>
+            <th>Số lượng</th>
+            <th>Người giao/trả</th>
           </tr>
         </thead>
         <tbody>
@@ -58,9 +58,9 @@
           <tr>
             <td>
               {% if t.type == 'issue' %}
-                <span class="badge bg-primary">Issue</span>
+                <span class="badge bg-primary">Giao</span>
               {% else %}
-                <span class="badge bg-success">Return</span>
+                <span class="badge bg-success">Trả</span>
               {% endif %}
             </td>
             <td>{{ t.timestamp.strftime('%Y-%m-%d %H:%M') if t.timestamp else '—' }}</td>
@@ -73,7 +73,7 @@
         </tbody>
       </table>
     {% else %}
-      <p class="text-muted">No transactions found for this marathon.</p>
+      <p class="text-muted">Không có dữ liệu.</p>
     {% endif %}
   {% endif %}
 </div>

@@ -50,14 +50,26 @@ def issue():
         equipment_ids = request.form.getlist('equipment[]')
         quantities = request.form.getlist('quantity[]')
         new_equipments = request.form.getlist('new_equipment[]')
-        for idx, ne in enumerate(new_equipments):
-            if ne and not ne.isspace():
-                eq = Equipment(name=ne.strip()); db.session.add(eq); db.session.commit()
-                if idx < len(equipment_ids) and (not equipment_ids[idx] or equipment_ids[idx]==''):
-                    equipment_ids[idx] = str(eq.id)
-                else:
-                    equipment_ids.append(str(eq.id))
-        for eq_id, qty in zip(equipment_ids, quantities):
+        
+        # Build final equipment IDs list - use new_equipment[] if it has value, otherwise use equipment[]
+        final_equipment_ids = []
+        for idx in range(len(quantities)):
+            # Check if new_equipment has a value for this row
+            if idx < len(new_equipments) and new_equipments[idx] and not new_equipments[idx].isspace():
+                # Create new equipment and use its ID
+                eq = Equipment(name=new_equipments[idx].strip())
+                db.session.add(eq)
+                db.session.commit()
+                final_equipment_ids.append(str(eq.id))
+            elif idx < len(equipment_ids) and equipment_ids[idx]:
+                # Use the selected equipment ID from dropdown
+                final_equipment_ids.append(equipment_ids[idx])
+            else:
+                # No equipment selected for this row
+                final_equipment_ids.append(None)
+        
+        # Save records
+        for eq_id, qty in zip(final_equipment_ids, quantities):
             try: q=int(qty)
             except: q=0
             if q<=0 or not eq_id: continue

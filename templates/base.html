@@ -15,13 +15,13 @@
           <div class="logo-circle me-2">BR</div>
           <div>
             <div class="fw-bold">Bê Rào Checklist</div>
-            <small class="text-muted">Equipment Management</small>
+            <small class="text-muted">Quản Lý Đồ Dùng/Thiết Bị</small>
           </div>
         </a>
         <div>
-          <a class="btn btn-outline-primary me-2" href="{{ url_for('issue') }}">Issue</a>
-          <a class="btn btn-outline-secondary me-2" href="{{ url_for('return_equipment') }}">Return</a>
-          <a class="btn btn-outline-success me-2" href="{{ url_for('report') }}">Reports</a>
+          <a class="btn btn-outline-primary me-2" href="{{ url_for('issue') }}">Giao Đồ</a>
+          <a class="btn btn-outline-secondary me-2" href="{{ url_for('return_equipment') }}">Trả Đồ</a>
+          <a class="btn btn-outline-success me-2" href="{{ url_for('report') }}">Báo Cáo</a>
           {% if session.get('admin_logged_in') %}
             <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">Admin</a>
           {% else %}
@@ -44,7 +44,7 @@
       {% block content %}{% endblock %}
     </main>
     <footer class="text-center text-muted py-3">
-      <small>© Bê Rào Checklist — Demo app</small>
+      <small>© Bê Rào Checklist</small>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
