@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <h3>Reports</h3>
+  <div class="mb-3">
+    <div class="row g-2">
+      <div class="col-md-6">
+        <label class="form-label">Marathon</label>
+        <select name="marathon" id="report-marathon-select" class="form-select" onchange="onReportMarathonChange()">
+          <option value="">-- Select Marathon --</option>
+          {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {% if selected_marathon %}
+    <h5>Equipment summary</h5>
+    <table class="table">
+      <thead><tr><th>Equipment</th><th>Issued</th><th>Returned</th><th>Remaining</th></tr></thead>
+      <tbody>
+        {% for r in equipment_summary %}
+        <tr {% if r.remaining>0 %}class="table-warning"{% endif %}>
+          <td>{{ r.equipment }}</td><td>{{ r.issued }}</td><td>{{ r.returned }}</td><td>{{ r.remaining }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h5>Missing by station</h5>
+    {% if station_details %}
+      {% for st in station_details %}
+        <div class="mb-2"><strong>{{ st.station }}</strong>
+          <ul>
+            {% for it in st['items'] %}<li>{{ it.equipment }}: thiếu {{ it.missing }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No missing items for this marathon.</p>
+    {% endif %}
+
+    <h5 class="mt-4">Transaction History</h5>
+    {% if transactions %}
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Date/Time</th>
+            <th>Station</th>
+            <th>Equipment</th>
+            <th>Quantity</th>
+            <th>Person</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>
+              {% if t.type == 'issue' %}
+                <span class="badge bg-primary">Issue</span>
+              {% else %}
+                <span class="badge bg-success">Return</span>
+              {% endif %}
+            </td>
+            <td>{{ t.timestamp.strftime('%Y-%m-%d %H:%M') if t.timestamp else '—' }}</td>
+            <td>{{ t.station or '—' }}</td>
+            <td>{{ t.equipment or '—' }}</td>
+            <td>{{ t.quantity }}</td>
+            <td>{{ t.person }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">No transactions found for this marathon.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<script>
+  function onReportMarathonChange() {
+    const sel = document.getElementById('report-marathon-select');
+    if (!sel) return;
+    const marathon = sel.value;
+    const params = new URLSearchParams(window.location.search);
+    if (marathon) params.set('marathon', marathon);
+    else params.delete('marathon');
+    window.location.search = params.toString();
+  }
+</script>
+{% endblock %}
