@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Admin Dashboard</h3>
+    <a href="{{ url_for('admin_logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+  </div>
+
+  <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue-records" type="button">Issue Records</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return-records" type="button">Return Records</button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="adminTabsContent">
+    <!-- Issue Records Tab -->
+    <div class="tab-pane fade show active" id="issue-records" role="tabpanel">
+      <h5>Issue Records (Latest 100)</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Date/Time</th>
+              <th>Marathon</th>
+              <th>Station</th>
+              <th>Equipment</th>
+              <th>Quantity</th>
+              <th>Person</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in issue_records %}
+            <tr>
+              <td>{{ record.id }}</td>
+              <td>{{ record.timestamp.strftime('%Y-%m-%d %H:%M') if record.timestamp else '—' }}</td>
+              <td>{{ marathons|selectattr('id', 'equalto', record.marathon_id)|map(attribute='name')|first if record.marathon_id else '—' }}</td>
+              <td>{{ stations|selectattr('id', 'equalto', record.station_id)|map(attribute='name')|first if record.station_id else '—' }}</td>
+              <td>{{ equipments|selectattr('id', 'equalto', record.equipment_id)|map(attribute='name')|first or '—' }}</td>
+              <td>{{ record.quantity }}</td>
+              <td>{{ record.person_name }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ url_for('edit_issue_record', record_id=record.id) }}" class="btn btn-outline-primary">Edit</a>
+                  <form method="post" action="{{ url_for('delete_issue_record', record_id=record.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Return Records Tab -->
+    <div class="tab-pane fade" id="return-records" role="tabpanel">
+      <h5>Return Records (Latest 100)</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Date/Time</th>
+              <th>Marathon</th>
+              <th>Station</th>
+              <th>Equipment</th>
+              <th>Quantity</th>
+              <th>Person</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in return_records %}
+            <tr>
+              <td>{{ record.id }}</td>
+              <td>{{ record.timestamp.strftime('%Y-%m-%d %H:%M') if record.timestamp else '—' }}</td>
+              <td>{{ marathons|selectattr('id', 'equalto', record.marathon_id)|map(attribute='name')|first if record.marathon_id else '—' }}</td>
+              <td>{{ stations|selectattr('id', 'equalto', record.station_id)|map(attribute='name')|first if record.station_id else '—' }}</td>
+              <td>{{ equipments|selectattr('id', 'equalto', record.equipment_id)|map(attribute='name')|first or '—' }}</td>
+              <td>{{ record.quantity }}</td>
+              <td>{{ record.person_name }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ url_for('edit_return_record', record_id=record.id) }}" class="btn btn-outline-primary">Edit</a>
+                  <form method="post" action="{{ url_for('delete_return_record', record_id=record.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                    <button type="submit" class="btn btn-outline-danger">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

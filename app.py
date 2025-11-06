@@ -1,8 +1,9 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
 from models import db, init_db, Station, Equipment, Person, Marathon, IssueRecord, ReturnRecord
 from datetime import datetime
 from dotenv import load_dotenv
+from functools import wraps
 load_dotenv()
 app = Flask(__name__)
 database_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
@@ -10,9 +11,20 @@ if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://","postgresql://",1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 db.init_app(app)
 with app.app_context():
     init_db()
+
+# Admin login decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            flash('Please login to access this page.', 'warning')
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
 @app.route('/')
 def index():
     return render_template('index.html', title="Bê Rào Checklist")
@@ -168,4 +180,91 @@ def api_add_marathon():
 @app.route('/api/persons')
 def api_persons():
     persons = Person.query.order_by(Person.name).all(); return jsonify([p.name for p in persons])
+
+# Admin routes
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        admin_user = os.getenv('ADMIN_USERNAME', 'admin')
+        admin_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
+        if username == admin_user and password == admin_pass:
+            session['admin_logged_in'] = True
+            flash('Successfully logged in!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('Invalid credentials!', 'danger')
+    return render_template('admin_login.html')
+
+@app.route('/admin/logout')
+def admin_logout():
+    session.pop('admin_logged_in', None)
+    flash('Successfully logged out!', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/admin/dashboard')
+@admin_required
+def admin_dashboard():
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    stations = Station.query.order_by(Station.name).all()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    issue_records = IssueRecord.query.order_by(IssueRecord.timestamp.desc()).limit(100).all()
+    return_records = ReturnRecord.query.order_by(ReturnRecord.timestamp.desc()).limit(100).all()
+    return render_template('admin_dashboard.html', marathons=marathons, stations=stations, equipments=equipments, issue_records=issue_records, return_records=return_records)
+
+@app.route('/admin/delete/issue/<int:record_id>', methods=['POST'])
+@admin_required
+def delete_issue_record(record_id):
+    record = IssueRecord.query.get_or_404(record_id)
+    db.session.delete(record)
+    db.session.commit()
+    flash('Issue record deleted successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/delete/return/<int:record_id>', methods=['POST'])
+@admin_required
+def delete_return_record(record_id):
+    record = ReturnRecord.query.get_or_404(record_id)
+    db.session.delete(record)
+    db.session.commit()
+    flash('Return record deleted successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/edit/issue/<int:record_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_issue_record(record_id):
+    record = IssueRecord.query.get_or_404(record_id)
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    stations = Station.query.order_by(Station.name).all()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    if request.method == 'POST':
+        record.marathon_id = request.form.get('marathon') or None
+        record.station_id = request.form.get('station') or None
+        record.equipment_id = request.form.get('equipment')
+        record.quantity = int(request.form.get('quantity'))
+        record.person_name = request.form.get('person')
+        db.session.commit()
+        flash('Issue record updated successfully!', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_edit_issue.html', record=record, marathons=marathons, stations=stations, equipments=equipments)
+
+@app.route('/admin/edit/return/<int:record_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_return_record(record_id):
+    record = ReturnRecord.query.get_or_404(record_id)
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    stations = Station.query.order_by(Station.name).all()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    if request.method == 'POST':
+        record.marathon_id = request.form.get('marathon') or None
+        record.station_id = request.form.get('station') or None
+        record.equipment_id = request.form.get('equipment')
+        record.quantity = int(request.form.get('quantity'))
+        record.person_name = request.form.get('person')
+        db.session.commit()
+        flash('Return record updated successfully!', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_edit_return.html', record=record, marathons=marathons, stations=stations, equipments=equipments)
+
 if __name__=='__main__': app.run(debug=True)

@@ -21,11 +21,26 @@
         <div>
           <a class="btn btn-outline-primary me-2" href="{{ url_for('issue') }}">Issue</a>
           <a class="btn btn-outline-secondary me-2" href="{{ url_for('return_equipment') }}">Return</a>
-          <a class="btn btn-outline-success" href="{{ url_for('report') }}">Reports</a>
+          <a class="btn btn-outline-success me-2" href="{{ url_for('report') }}">Reports</a>
+          {% if session.get('admin_logged_in') %}
+            <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">Admin</a>
+          {% else %}
+            <a class="btn btn-outline-dark" href="{{ url_for('admin_login') }}">Login</a>
+          {% endif %}
         </div>
       </div>
     </nav>
     <main class="container py-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
       {% block content %}{% endblock %}
     </main>
     <footer class="text-center text-muted py-3">
