@@ -19,8 +19,14 @@
           </div>
         </a>
         <div class="d-flex gap-2">
-          <a class="btn btn-outline-secondary" href="{{ url_for('issue') }}">📦 Giao Đồ</a>
-          <a class="btn btn-outline-secondary" href="{{ url_for('return_equipment') }}">↩️ Trả Đồ</a>
+          {% if user and user.role == 'storekeeper' %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('store_issue') }}">📤 Xuất Kho</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('store_return') }}">📥 Nhập Kho</a>
+          {% else %}
+            <a class="btn btn-outline-secondary" href="{{ url_for('issue') }}">📦 Giao Đồ</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('return_equipment') }}">↩️ Trả Đồ</a>
+          {% endif %}
+          
           <a class="btn btn-outline-success" href="{{ url_for('report') }}">📊 Xem Báo Cáo</a>
           
           {% if user and user.role == 'admin' %}
@@ -29,6 +35,7 @@
           {% endif %}
 
           {% if session.get('user_id') %}
+            <a class="btn btn-outline-primary" href="{{ url_for('change_password') }}">🔑 Đổi Mật Khẩu</a>
             <a class="btn btn-outline-danger" href="{{ url_for('logout') }}">🚪 Đăng Xuất</a>
           {% else %}
             <a class="btn btn-outline-dark" href="{{ url_for('login') }}">🔐 Đăng Nhập</a>

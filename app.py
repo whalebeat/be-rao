@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
-from models import db, init_db, Station, Equipment, Person, Marathon, IssueRecord, ReturnRecord, User
+from models import db, init_db, Station, Equipment, Person, Marathon, IssueRecord, ReturnRecord, User, StoreIssueRecord, StoreReturnRecord
 from datetime import datetime
 from dotenv import load_dotenv
 from functools import wraps
@@ -73,6 +73,34 @@ def logout():
     flash('Bạn đã đăng xuất thành công!', 'success')
     return redirect(url_for('login'))
 
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    user = get_current_user()
+    if request.method == 'POST':
+        current_password = request.form.get('current_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not current_password or not new_password or not confirm_password:
+            flash('Vui lòng điền đầy đủ thông tin!', 'danger')
+            return render_template('change_password.html', user=user)
+        
+        if not user.check_password(current_password):
+            flash('Mật khẩu hiện tại không đúng!', 'danger')
+            return render_template('change_password.html', user=user)
+        
+        if new_password != confirm_password:
+            flash('Mật khẩu mới không khớp!', 'danger')
+            return render_template('change_password.html', user=user)
+        
+        user.set_password(new_password)
+        db.session.commit()
+        flash('Mật khẩu đã được thay đổi thành công!', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('change_password.html', user=user)
+
 @app.route('/issue', methods=['GET','POST'])
 @login_required
 def issue():
@@ -90,7 +118,13 @@ def issue():
         new_station = request.form.get('new_station')
         if new_station:
             s = Station(name=new_station); db.session.add(s); db.session.commit(); station_id = s.id
-        person_name = request.form.get('person') or request.form.get('new_person') or user.username
+        
+        # Only admin can select/enter a different person, others use their username
+        if user.role == 'admin':
+            person_name = request.form.get('person') or request.form.get('new_person') or user.username
+        else:
+            person_name = user.username
+        
         person = Person.query.filter_by(name=person_name).first()
         if not person:
             person = Person(name=person_name); db.session.add(person); db.session.commit()
@@ -169,7 +203,13 @@ def return_equipment():
         new_station = request.form.get('new_station')
         if new_station:
             s = Station(name=new_station); db.session.add(s); db.session.commit(); station_id = s.id
-        person_name = request.form.get('person') or request.form.get('new_person') or user.username
+        
+        # Only admin can select/enter a different person, others use their username
+        if user.role == 'admin':
+            person_name = request.form.get('person') or request.form.get('new_person') or user.username
+        else:
+            person_name = user.username
+        
         person = Person.query.filter_by(name=person_name).first()
         if not person:
             person = Person(name=person_name); db.session.add(person); db.session.commit()
@@ -201,10 +241,19 @@ def report():
     stations = Station.query.order_by(Station.name).all()
     if marathon_id:
         for eq in equipments:
+            store_issued = db.session.query(func.sum(StoreIssueRecord.quantity)).filter(StoreIssueRecord.equipment_id==eq.id, StoreIssueRecord.marathon_id==marathon_id).scalar() or 0
             issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
             returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
+            store_returned = db.session.query(func.sum(StoreReturnRecord.quantity)).filter(StoreReturnRecord.equipment_id==eq.id, StoreReturnRecord.marathon_id==marathon_id).scalar() or 0
             diff = issued - returned
-            equipment_summary.append({'equipment': eq.name, 'issued': int(issued), 'returned': int(returned), 'remaining': int(diff)})
+            equipment_summary.append({
+                'equipment': eq.name, 
+                'store_issued': int(store_issued),
+                'issued': int(issued), 
+                'returned': int(returned), 
+                'store_returned': int(store_returned),
+                'remaining': int(diff)
+            })
         for st in stations:
             items = []
             for eq in equipments:
@@ -214,8 +263,23 @@ def report():
                 if diff>0: items.append({'equipment': eq.name, 'missing': int(diff)})
             if items: station_details.append({'station': st.name, 'items': items})
         # Get transaction history
+        store_issue_records = StoreIssueRecord.query.filter_by(marathon_id=marathon_id).all()
         issue_records = IssueRecord.query.filter_by(marathon_id=marathon_id).all()
         return_records = ReturnRecord.query.filter_by(marathon_id=marathon_id).all()
+        store_return_records = StoreReturnRecord.query.filter_by(marathon_id=marathon_id).all()
+        
+        for rec in store_issue_records:
+            equipment = Equipment.query.get(rec.equipment_id)
+            transactions.append({
+                'type': 'store_issue',
+                'timestamp': rec.timestamp,
+                'station': None,
+                'equipment': equipment.name if equipment else None,
+                'quantity': rec.quantity,
+                'person': rec.person_name,
+                'created_by': rec.created_by
+            })
+        
         for rec in issue_records:
             station = Station.query.get(rec.station_id) if rec.station_id else None
             equipment = Equipment.query.get(rec.equipment_id)
@@ -228,6 +292,7 @@ def report():
                 'person': rec.person_name,
                 'created_by': rec.created_by
             })
+        
         for rec in return_records:
             station = Station.query.get(rec.station_id) if rec.station_id else None
             equipment = Equipment.query.get(rec.equipment_id)
@@ -240,9 +305,129 @@ def report():
                 'person': rec.person_name,
                 'created_by': rec.created_by
             })
+        
+        for rec in store_return_records:
+            equipment = Equipment.query.get(rec.equipment_id)
+            transactions.append({
+                'type': 'store_return',
+                'timestamp': rec.timestamp,
+                'station': None,
+                'equipment': equipment.name if equipment else None,
+                'quantity': rec.quantity,
+                'person': rec.person_name,
+                'created_by': rec.created_by
+            })
+        
         # Sort transactions by timestamp descending (newest first)
         transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
     return render_template('report.html', marathons=marathons, equipment_summary=equipment_summary, station_details=station_details, selected_marathon=marathon_id, transactions=transactions, user=user)
+
+@app.route('/store_issue', methods=['GET','POST'])
+@login_required
+def store_issue():
+    user = get_current_user()
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    persons = Person.query.order_by(Person.name).all()
+    if request.method=='POST':
+        marathon_id = request.form.get('marathon') or None
+        new_marathon = request.form.get('new_marathon')
+        if new_marathon:
+            m = Marathon(name=new_marathon)
+            db.session.add(m)
+            db.session.commit()
+            marathon_id = m.id
+        
+        person_name = request.form.get('person') or request.form.get('new_person')
+        if person_name:
+            person = Person.query.filter_by(name=person_name).first()
+            if not person:
+                person = Person(name=person_name)
+                db.session.add(person)
+                db.session.commit()
+        
+        equipment_ids = request.form.getlist('equipment[]')
+        quantities = request.form.getlist('quantity[]')
+        
+        for eq_id, qty in zip(equipment_ids, quantities):
+            try: q=int(qty)
+            except: q=0
+            if q<=0 or not eq_id: continue
+            r = StoreIssueRecord(marathon_id=marathon_id, equipment_id=eq_id, 
+                          person_name=person_name, quantity=q, timestamp=datetime.utcnow(),
+                          created_by=user.username)
+            db.session.add(r)
+        db.session.commit()
+        flash('Xuất kho thành công!', 'success')
+        return redirect(url_for('store_issue'))
+    return render_template('store_issue.html', marathons=marathons, equipments=equipments, persons=persons, user=user)
+
+@app.route('/store_return', methods=['GET','POST'])
+@login_required
+def store_return():
+    user = get_current_user()
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    persons = Person.query.order_by(Person.name).all()
+    marathon_id = request.args.get('marathon') or None
+    unreturned = []
+    if marathon_id:
+        from sqlalchemy import func
+        # Calculate: store_issued - issue + return - store_returned
+        store_issued_q = db.session.query(StoreIssueRecord.equipment_id, func.sum(StoreIssueRecord.quantity).label('store_issued')).filter(StoreIssueRecord.marathon_id==marathon_id).group_by(StoreIssueRecord.equipment_id).subquery()
+        issued_q = db.session.query(IssueRecord.equipment_id, func.sum(IssueRecord.quantity).label('issued')).filter(IssueRecord.marathon_id==marathon_id).group_by(IssueRecord.equipment_id).subquery()
+        returned_q = db.session.query(ReturnRecord.equipment_id, func.sum(ReturnRecord.quantity).label('returned')).filter(ReturnRecord.marathon_id==marathon_id).group_by(ReturnRecord.equipment_id).subquery()
+        store_returned_q = db.session.query(StoreReturnRecord.equipment_id, func.sum(StoreReturnRecord.quantity).label('store_returned')).filter(StoreReturnRecord.marathon_id==marathon_id).group_by(StoreReturnRecord.equipment_id).subquery()
+        
+        base_query = db.session.query(
+            store_issued_q.c.equipment_id,
+            store_issued_q.c.store_issued,
+            issued_q.c.issued,
+            returned_q.c.returned,
+            store_returned_q.c.store_returned
+        ).outerjoin(issued_q, store_issued_q.c.equipment_id==issued_q.c.equipment_id
+        ).outerjoin(returned_q, store_issued_q.c.equipment_id==returned_q.c.equipment_id
+        ).outerjoin(store_returned_q, store_issued_q.c.equipment_id==store_returned_q.c.equipment_id)
+        
+        rows = base_query.all()
+        for r in rows:
+            store_issued = r.store_issued or 0
+            issued = r.issued or 0
+            returned = r.returned or 0
+            store_returned = r.store_returned or 0
+            # Available to return to store = returned from stations - already returned to store
+            available = returned - store_returned
+            if available > 0:
+                eq = Equipment.query.get(r.equipment_id)
+                unreturned.append({'equipment_id': r.equipment_id, 'equipment': eq.name if eq else '—', 'available': int(available)})
+    
+    if request.method=='POST':
+        marathon_id = request.form.get('marathon') or None
+        person_name = request.form.get('person') or request.form.get('new_person')
+        if person_name:
+            person = Person.query.filter_by(name=person_name).first()
+            if not person:
+                person = Person(name=person_name)
+                db.session.add(person)
+                db.session.commit()
+        
+        equipment_ids = request.form.getlist('equipment[]')
+        quantities = request.form.getlist('quantity[]')
+        
+        for eq_id, qty in zip(equipment_ids, quantities):
+            try: q=int(qty)
+            except: q=0
+            if q<=0 or not eq_id: continue
+            r = StoreReturnRecord(marathon_id=marathon_id, equipment_id=eq_id, 
+                           person_name=person_name, quantity=q, timestamp=datetime.utcnow(),
+                           created_by=user.username)
+            db.session.add(r)
+        db.session.commit()
+        flash('Nhập kho thành công!', 'success')
+        return redirect(url_for('store_return', marathon=marathon_id))
+    
+    return render_template('store_return.html', marathons=marathons, equipments=equipments, persons=persons,
+                         unreturned=unreturned, selected_marathon=marathon_id, user=user)
 
 @app.route('/api/add_station', methods=['POST'])
 @login_required
@@ -409,5 +594,104 @@ def edit_return_record(record_id):
         flash('Bản ghi nhập đã được cập nhật thành công!', 'success')
         return redirect(url_for('admin_dashboard'))
     return render_template('admin_edit_return.html', record=record, marathons=marathons, stations=stations, equipments=equipments, user=user)
+
+# Marathon management routes
+@app.route('/admin/marathon/add', methods=['POST'])
+@admin_required
+def admin_add_marathon():
+    name = request.form.get('name')
+    if name:
+        marathon = Marathon(name=name)
+        db.session.add(marathon)
+        db.session.commit()
+        flash(f'Giải chạy "{name}" đã được thêm!', 'success')
+    return redirect(url_for('admin_dashboard') + '#marathons')
+
+@app.route('/admin/marathon/<int:marathon_id>/edit', methods=['POST'])
+@admin_required
+def admin_edit_marathon(marathon_id):
+    marathon = Marathon.query.get_or_404(marathon_id)
+    name = request.form.get('name')
+    if name:
+        marathon.name = name
+        db.session.commit()
+        flash(f'Giải chạy đã được cập nhật!', 'success')
+    return redirect(url_for('admin_dashboard') + '#marathons')
+
+@app.route('/admin/marathon/<int:marathon_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_marathon(marathon_id):
+    marathon = Marathon.query.get_or_404(marathon_id)
+    name = marathon.name
+    db.session.delete(marathon)
+    db.session.commit()
+    flash(f'Giải chạy "{name}" đã được xóa!', 'success')
+    return redirect(url_for('admin_dashboard') + '#marathons')
+
+# Station management routes
+@app.route('/admin/station/add', methods=['POST'])
+@admin_required
+def admin_add_station_form():
+    name = request.form.get('name')
+    if name:
+        station = Station(name=name)
+        db.session.add(station)
+        db.session.commit()
+        flash(f'Trạm "{name}" đã được thêm!', 'success')
+    return redirect(url_for('admin_dashboard') + '#stations')
+
+@app.route('/admin/station/<int:station_id>/edit', methods=['POST'])
+@admin_required
+def admin_edit_station(station_id):
+    station = Station.query.get_or_404(station_id)
+    name = request.form.get('name')
+    if name:
+        station.name = name
+        db.session.commit()
+        flash(f'Trạm đã được cập nhật!', 'success')
+    return redirect(url_for('admin_dashboard') + '#stations')
+
+@app.route('/admin/station/<int:station_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_station(station_id):
+    station = Station.query.get_or_404(station_id)
+    name = station.name
+    db.session.delete(station)
+    db.session.commit()
+    flash(f'Trạm "{name}" đã được xóa!', 'success')
+    return redirect(url_for('admin_dashboard') + '#stations')
+
+# Equipment management routes
+@app.route('/admin/equipment/add', methods=['POST'])
+@admin_required
+def admin_add_equipment_form():
+    name = request.form.get('name')
+    if name:
+        equipment = Equipment(name=name)
+        db.session.add(equipment)
+        db.session.commit()
+        flash(f'Thiết bị "{name}" đã được thêm!', 'success')
+    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+
+@app.route('/admin/equipment/<int:equipment_id>/edit', methods=['POST'])
+@admin_required
+def admin_edit_equipment(equipment_id):
+    equipment = Equipment.query.get_or_404(equipment_id)
+    name = request.form.get('name')
+    if name:
+        equipment.name = name
+        db.session.commit()
+        flash(f'Thiết bị đã được cập nhật!', 'success')
+    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+
+@app.route('/admin/equipment/<int:equipment_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_equipment(equipment_id):
+    equipment = Equipment.query.get_or_404(equipment_id)
+    name = equipment.name
+    db.session.delete(equipment)
+    db.session.commit()
+    flash(f'Thiết bị "{name}" đã được xóa!', 'success')
+    return redirect(url_for('admin_dashboard') + '#equipments-manage')
 
 if __name__=='__main__': app.run(debug=True)

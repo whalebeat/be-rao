@@ -7,7 +7,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='user')  # 'admin' or 'user'
+    role = db.Column(db.String(20), default='user')  # 'admin', 'user', or 'storekeeper'
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -51,6 +51,26 @@ class ReturnRecord(db.Model):
     timestamp = db.Column(db.DateTime)
     created_by = db.Column(db.String(100))  # Username of creator
 
+class StoreIssueRecord(db.Model):
+    """Xuất kho - Store issues equipment to be dispatched"""
+    id = db.Column(db.Integer, primary_key=True)
+    marathon_id = db.Column(db.Integer, db.ForeignKey('marathon.id'), nullable=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id'), nullable=False)
+    person_name = db.Column(db.String(200))  # Person receiving from store
+    quantity = db.Column(db.Integer)
+    timestamp = db.Column(db.DateTime)
+    created_by = db.Column(db.String(100))  # Username of storekeeper
+
+class StoreReturnRecord(db.Model):
+    """Nhập kho - Equipment returned back to store"""
+    id = db.Column(db.Integer, primary_key=True)
+    marathon_id = db.Column(db.Integer, db.ForeignKey('marathon.id'), nullable=True)
+    equipment_id = db.Column(db.Integer, db.ForeignKey('equipment.id'), nullable=False)
+    person_name = db.Column(db.String(200))  # Person returning to store
+    quantity = db.Column(db.Integer)
+    timestamp = db.Column(db.DateTime)
+    created_by = db.Column(db.String(100))  # Username of storekeeper
+
 
 def init_db():
     db.create_all()
@@ -76,6 +96,12 @@ def init_db():
         # Add `created_by` to return_record if missing
         if not _has_column('return_record', 'created_by'):
             db.session.execute(text("ALTER TABLE return_record ADD COLUMN created_by TEXT"))
+        # Add `person_name` to store_issue_record if missing
+        if not _has_column('store_issue_record', 'person_name'):
+            db.session.execute(text("ALTER TABLE store_issue_record ADD COLUMN person_name TEXT"))
+        # Add `person_name` to store_return_record if missing
+        if not _has_column('store_return_record', 'person_name'):
+            db.session.execute(text("ALTER TABLE store_return_record ADD COLUMN person_name TEXT"))
         db.session.commit()
     # Create default admin user if not exists
     admin = User.query.filter_by(username='admin').first()

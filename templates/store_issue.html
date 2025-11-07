@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <h3>Xuất Kho</h3>
+  <form method="post" id="store-issue-form">
+    <div class="row g-2 mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Giải chạy</label>
+        <div class="input-group">
+          <select name="marathon" id="marathon-select" class="form-select">
+            <option value="">-- Chọn Giải chạy --</option>
+            {% for m in marathons %}
+              <option value="{{ m.id }}">{{ m.name }}</option>
+            {% endfor %}
+          </select>
+          <input class="form-control" name="new_marathon" placeholder="Hoặc nhập tên mới">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Người nhận</label>
+        <div class="input-group">
+          <select name="person" id="person-select" class="form-select">
+            <option value="">-- Chọn người nhận --</option>
+            {% for p in persons %}
+              <option value="{{ p.name }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới">
+        </div>
+      </div>
+    </div>
+
+    <h5>Danh sách thiết bị xuất kho</h5>
+    <table class="table" id="equipment-table">
+      <thead><tr><th>Tên thiết bị</th><th>Số lượng</th><th></th></tr></thead>
+      <tbody>
+        <tr class="item-row">
+          <td>
+            <select name="equipment[]" class="form-select">
+              <option value="">-- Chọn --</option>
+              {% for e in equipments %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+            </select>
+          </td>
+          <td><input name="quantity[]" type="number" min="1" class="form-control" value="1"></td>
+          <td><button type="button" class="btn btn-sm btn-danger remove-row">X</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="d-flex gap-2">
+      <button type="button" id="add-row" class="btn btn-sm btn-outline-primary">+ Thêm hàng mới</button>
+      <button type="submit" class="btn btn-primary">Lưu</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById('add-row').addEventListener('click', function() {
+  const table = document.querySelector('#equipment-table tbody');
+  const newRow = document.querySelector('.item-row').cloneNode(true);
+  newRow.querySelectorAll('input').forEach(input => input.value = input.type === 'number' ? '1' : '');
+  newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+  table.appendChild(newRow);
+});
+
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('remove-row')) {
+    const rows = document.querySelectorAll('.item-row');
+    if (rows.length > 1) {
+      e.target.closest('.item-row').remove();
+    }
+  }
+});
+</script>
+{% endblock %}

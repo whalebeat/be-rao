@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <h3>Nhập Kho</h3>
+  <form method="post" id="store-return-form">
+    <div class="row g-2 mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Giải chạy</label>
+        <select name="marathon" id="marathon-select-return" class="form-select" onchange="window.location.href='{{ url_for('store_return') }}?marathon=' + this.value">
+          <option value="">-- Chọn Giải chạy --</option>
+          {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Người trả</label>
+        <div class="input-group">
+          <select name="person" id="person-select-return" class="form-select">
+            <option value="">-- Chọn người trả --</option>
+            {% for p in persons %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}
+          </select>
+          <input class="form-control" name="new_person" placeholder="Hoặc nhập tên mới">
+        </div>
+      </div>
+    </div>
+
+    <h5>Đồ có thể nhập kho</h5>
+    {% if unreturned %}
+      <table class="table" id="return-table">
+        <thead><tr><th>Tên thiết bị</th><th>Số lượng có sẵn</th><th>Số lượng nhập kho</th></tr></thead>
+        <tbody>
+          {% for it in unreturned %}
+          <tr>
+            <td>{{ it.equipment }}<input type="hidden" name="equipment[]" value="{{ it.equipment_id }}"></td>
+            <td>{{ it.available }}</td>
+            <td><input name="quantity[]" type="number" min="0" max="{{ it.available }}" value="0" class="form-control"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Lưu</button>
+      </div>
+    {% else %}
+      <p class="text-muted">Chọn Giải chạy để xem đồ có thể nhập kho.</p>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
