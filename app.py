@@ -45,6 +45,17 @@ def get_current_user():
         return User.query.get(session['user_id'])
     return None
 
+def get_user_marathons(user):
+    """Get marathons accessible to the user based on their role"""
+    if not user:
+        return []
+    if user.role in ['admin', 'storekeeper']:
+        # Admins and storekeepers can see all marathons
+        return Marathon.query.order_by(Marathon.name).all()
+    else:
+        # Regular users can only see assigned marathons
+        return user.assigned_marathons
+
 @app.route('/')
 @login_required
 def index():
@@ -65,7 +76,7 @@ def login():
             return redirect(url_for('index'))
         else:
             flash('Tên đăng nhập hoặc mật khẩu không đúng!', 'danger')
-    return render_template('login.html')
+    return render_template('login.html', user=None)
 
 @app.route('/logout')
 def logout():
@@ -105,7 +116,7 @@ def change_password():
 @login_required
 def issue():
     user = get_current_user()
-    marathons = Marathon.query.order_by(Marathon.name).all()
+    marathons = get_user_marathons(user)
     stations = Station.query.order_by(Station.name).all()
     equipments = Equipment.query.order_by(Equipment.name).all()
     persons = Person.query.order_by(Person.name).all()
@@ -173,7 +184,7 @@ def issue():
 @login_required
 def return_equipment():
     user = get_current_user()
-    marathons = Marathon.query.order_by(Marathon.name).all()
+    marathons = get_user_marathons(user)
     stations = Station.query.order_by(Station.name).all()
     equipments = Equipment.query.order_by(Equipment.name).all()
     persons = Person.query.order_by(Person.name).all()
@@ -693,5 +704,91 @@ def admin_delete_equipment(equipment_id):
     db.session.commit()
     flash(f'Thiết bị "{name}" đã được xóa!', 'success')
     return redirect(url_for('admin_dashboard') + '#equipments-manage')
+
+# User-Marathon assignment routes
+@app.route('/admin/users/<int:user_id>/marathons', methods=['GET', 'POST'])
+@admin_required
+def admin_user_marathons(user_id):
+    current_user = get_current_user()
+    target_user = User.query.get_or_404(user_id)
+    all_marathons = Marathon.query.order_by(Marathon.name).all()
+    
+    if request.method == 'POST':
+        # Get selected marathon IDs from form
+        selected_marathon_ids = request.form.getlist('marathons')
+        selected_marathon_ids = [int(mid) for mid in selected_marathon_ids if mid]
+        
+        # Clear existing assignments
+        target_user.assigned_marathons = []
+        
+        # Add new assignments
+        for marathon_id in selected_marathon_ids:
+            marathon = Marathon.query.get(marathon_id)
+            if marathon:
+                target_user.assigned_marathons.append(marathon)
+        
+        db.session.commit()
+        flash(f'Đã cập nhật phân công giải chạy cho {target_user.username}!', 'success')
+        return redirect(url_for('admin_users'))
+    
+    return render_template('admin_user_marathons.html', target_user=target_user, all_marathons=all_marathons, user=current_user)
+
+@app.route('/admin/users/<int:user_id>/change_role', methods=['GET', 'POST'])
+@admin_required
+def admin_change_user_role(user_id):
+    current_user = get_current_user()
+    target_user = User.query.get_or_404(user_id)
+    
+    if target_user.id == current_user.id:
+        flash('Bạn không thể thay đổi vai trò của chính mình!', 'danger')
+        return redirect(url_for('admin_users'))
+    
+    if request.method == 'POST':
+        new_role = request.form.get('role')
+        if new_role in ['admin', 'user', 'storekeeper']:
+            target_user.role = new_role
+            db.session.commit()
+            flash(f'Đã thay đổi vai trò của {target_user.username} thành {new_role}!', 'success')
+            return redirect(url_for('admin_users'))
+        else:
+            flash('Vai trò không hợp lệ!', 'danger')
+    
+    return render_template('admin_change_role.html', target_user=target_user, user=current_user)
+
+@app.route('/admin/marathon_users', methods=['GET', 'POST'])
+@admin_required
+def admin_marathon_users():
+    current_user = get_current_user()
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    all_users = User.query.filter(User.role == 'user').order_by(User.username).all()
+    
+    selected_marathon_id = request.args.get('marathon') or (marathons[0].id if marathons else None)
+    selected_marathon = Marathon.query.get(selected_marathon_id) if selected_marathon_id else None
+    
+    if request.method == 'POST':
+        marathon_id = request.form.get('marathon_id')
+        selected_marathon = Marathon.query.get_or_404(marathon_id)
+        
+        # Get selected user IDs from form
+        selected_user_ids = request.form.getlist('users')
+        selected_user_ids = [int(uid) for uid in selected_user_ids if uid]
+        
+        # Clear existing assignments for this marathon
+        for user in selected_marathon.assigned_users:
+            if user.role != 'admin':  # Don't modify admin assignments
+                selected_marathon.assigned_users.remove(user)
+        
+        # Add new assignments
+        for user_id in selected_user_ids:
+            user = User.query.get(user_id)
+            if user and user.role != 'admin' and user not in selected_marathon.assigned_users:
+                selected_marathon.assigned_users.append(user)
+        
+        db.session.commit()
+        flash(f'Đã cập nhật phân công người dùng cho giải chạy "{selected_marathon.name}"!', 'success')
+        return redirect(url_for('admin_marathon_users', marathon=marathon_id))
+    
+    return render_template('admin_marathon_users.html', marathons=marathons, all_users=all_users, 
+                         selected_marathon=selected_marathon, user=current_user)
 
 if __name__=='__main__': app.run(debug=True)

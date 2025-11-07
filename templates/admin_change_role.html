@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card p-4">
+  <h3>Thay Đổi Vai Trò - {{ target_user.username }}</h3>
+  <p class="text-muted">Chọn vai trò mới cho người dùng này</p>
+  
+  <form method="post">
+    <div class="mb-3">
+      <label class="form-label fw-bold">Vai trò hiện tại:</label>
+      <p>
+        {% if target_user.role == 'admin' %}
+          <span class="badge bg-danger">Quản trị viên</span>
+        {% elif target_user.role == 'storekeeper' %}
+          <span class="badge bg-success">QL kho</span>
+        {% else %}
+          <span class="badge bg-primary">Người dùng</span>
+        {% endif %}
+      </p>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label fw-bold">Vai trò mới:</label>
+      <select name="role" class="form-select" required>
+        <option value="user" {% if target_user.role == 'user' %}selected{% endif %}>Người dùng</option>
+        <option value="storekeeper" {% if target_user.role == 'storekeeper' %}selected{% endif %}>QL kho</option>
+        <option value="admin" {% if target_user.role == 'admin' %}selected{% endif %}>Quản trị viên</option>
+      </select>
+      <div class="form-text">
+        <strong>Lưu ý:</strong><br>
+        • <strong>Người dùng:</strong> Chỉ truy cập giải chạy được phân công<br>
+        • <strong>QL kho:</strong> Quản lý kho và giải chạy được phân công<br>
+        • <strong>Quản trị viên:</strong> Truy cập tất cả giải chạy và toàn bộ chức năng quản trị
+      </div>
+    </div>
+    
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Lưu</button>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Hủy</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

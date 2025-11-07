@@ -3,11 +3,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+# Association table for User-Marathon many-to-many relationship
+user_marathon = db.Table('user_marathon',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('marathon_id', db.Integer, db.ForeignKey('marathon.id'), primary_key=True)
+)
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='user')  # 'admin', 'user', or 'storekeeper'
+    assigned_marathons = db.relationship('Marathon', secondary=user_marathon, backref='assigned_users')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

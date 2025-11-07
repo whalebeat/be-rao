@@ -19,7 +19,7 @@
           </div>
         </a>
         <div class="d-flex gap-2">
-          {% if user and user.role == 'storekeeper' %}
+          {% if user and user.role == 'storekeeper' or user.role == 'admin' %}
             <a class="btn btn-outline-secondary" href="{{ url_for('store_issue') }}">📤 Xuất Kho</a>
             <a class="btn btn-outline-secondary" href="{{ url_for('store_return') }}">📥 Nhập Kho</a>
           {% else %}

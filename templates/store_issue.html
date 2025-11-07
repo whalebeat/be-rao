@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card p-4">
-  <h3>Xuất Kho</h3>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Xuất Kho</h3>
+    {% if user and user.role == 'admin' %}
+    <a href="{{ url_for('issue') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i> Chuyển sang Giao Đồ
+    </a>
+    {% endif %}
+  </div>
   <form method="post" id="store-issue-form">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
@@ -13,7 +20,7 @@
               <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}
           </select>
-          <input class="form-control" name="new_marathon" placeholder="Hoặc nhập tên mới">
+          <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button>
         </div>
       </div>
       <div class="col-md-4">
@@ -53,6 +60,13 @@
   </form>
 </div>
 
+<!-- Modal for adding marathon -->
+<div class="modal fade" id="addMarathonModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Thêm giải chạy</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input id="new-marathon-name" class="form-control" placeholder="Tên Giải chạy"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button><button id="save-marathon" class="btn btn-primary">Save</button></div>
+</div></div></div>
+
 <script>
 document.getElementById('add-row').addEventListener('click', function() {
   const table = document.querySelector('#equipment-table tbody');
@@ -69,6 +83,25 @@ document.addEventListener('click', function(e) {
       e.target.closest('.item-row').remove();
     }
   }
+});
+
+// Add marathon functionality
+document.getElementById('save-marathon').addEventListener('click', function() {
+  const name = document.getElementById('new-marathon-name').value.trim();
+  if (!name) return alert('Vui lòng nhập tên Giải chạy!');
+  fetch('/api/add_marathon', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: name})
+  }).then(r => r.json()).then(data => {
+    const opt = document.createElement('option');
+    opt.value = data.id;
+    opt.textContent = data.name;
+    opt.selected = true;
+    document.getElementById('marathon-select').appendChild(opt);
+    document.getElementById('new-marathon-name').value = '';
+    bootstrap.Modal.getInstance(document.getElementById('addMarathonModal')).hide();
+  }).catch(err => alert('Lỗi khi thêm Giải chạy!'));
 });
 </script>
 {% endblock %}
