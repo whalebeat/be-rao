@@ -40,6 +40,20 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Admin or Storekeeper required decorator
+def admin_or_storekeeper_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('user_id'):
+            flash('Vui lòng đăng nhập để truy cập trang này.', 'warning')
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user or user.role not in ['admin', 'storekeeper']:
+            flash('Bạn không có quyền truy cập trang này.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def get_current_user():
     if session.get('user_id'):
         return User.query.get(session['user_id'])
@@ -258,7 +272,8 @@ def report():
             store_returned = db.session.query(func.sum(StoreReturnRecord.quantity)).filter(StoreReturnRecord.equipment_id==eq.id, StoreReturnRecord.marathon_id==marathon_id).scalar() or 0
             diff = issued - returned
             equipment_summary.append({
-                'equipment': eq.name, 
+                'equipment': eq.name,
+                'available': eq.available_quantity or 0,
                 'store_issued': int(store_issued),
                 'issued': int(issued), 
                 'returned': int(returned), 
@@ -704,6 +719,44 @@ def admin_delete_equipment(equipment_id):
     db.session.commit()
     flash(f'Thiết bị "{name}" đã được xóa!', 'success')
     return redirect(url_for('admin_dashboard') + '#equipments-manage')
+
+@app.route('/admin/equipment/<int:equipment_id>/set_available', methods=['POST'])
+@admin_required
+def admin_set_available_quantity(equipment_id):
+    equipment = Equipment.query.get_or_404(equipment_id)
+    available_quantity = request.form.get('available_quantity')
+    if available_quantity is not None:
+        try:
+            equipment.available_quantity = int(available_quantity)
+            db.session.commit()
+            flash(f'Đã cập nhật tồn kho cho "{equipment.name}"!', 'success')
+        except ValueError:
+            flash('Số lượng không hợp lệ!', 'danger')
+    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+
+# Bulk inventory management route (for admin and storekeeper)
+@app.route('/manage_inventory', methods=['GET', 'POST'])
+@admin_or_storekeeper_required
+def manage_inventory():
+    user = get_current_user()
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    
+    if request.method == 'POST':
+        # Get all equipment IDs and quantities from form
+        for equipment in equipments:
+            qty_key = f'quantity_{equipment.id}'
+            qty_value = request.form.get(qty_key)
+            if qty_value is not None:
+                try:
+                    equipment.available_quantity = int(qty_value)
+                except ValueError:
+                    pass  # Skip invalid values
+        
+        db.session.commit()
+        flash('Đã cập nhật tồn kho thành công!', 'success')
+        return redirect(url_for('manage_inventory'))
+    
+    return render_template('manage_inventory.html', equipments=equipments, user=user)
 
 # User-Marathon assignment routes
 @app.route('/admin/users/<int:user_id>/marathons', methods=['GET', 'POST'])

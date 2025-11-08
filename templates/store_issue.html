@@ -3,11 +3,18 @@
 <div class="card p-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0">Xuất Kho</h3>
-    {% if user and user.role == 'admin' %}
-    <a href="{{ url_for('issue') }}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left"></i> Chuyển sang Giao Đồ
-    </a>
-    {% endif %}
+    <div class="btn-group">
+      {% if user and user.role in ['admin', 'storekeeper'] %}
+      <a href="{{ url_for('manage_inventory') }}" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-gear"></i> Quản Lý Tồn Kho
+      </a>
+      {% endif %}
+      {% if user and user.role == 'admin' %}
+      <a href="{{ url_for('issue') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Chuyển sang Giao Đồ
+      </a>
+      {% endif %}
+    </div>
   </div>
   <form method="post" id="store-issue-form">
     <div class="row g-2 mb-3">
@@ -39,15 +46,16 @@
 
     <h5>Danh sách thiết bị xuất kho</h5>
     <table class="table" id="equipment-table">
-      <thead><tr><th>Tên thiết bị</th><th>Số lượng</th><th></th></tr></thead>
+      <thead><tr><th>Tên thiết bị</th><th>Tồn kho</th><th>Số lượng</th><th></th></tr></thead>
       <tbody>
         <tr class="item-row">
           <td>
-            <select name="equipment[]" class="form-select">
+            <select name="equipment[]" class="form-select equipment-select">
               <option value="">-- Chọn --</option>
-              {% for e in equipments %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+              {% for e in equipments %}<option value="{{ e.id }}" data-available="{{ e.available_quantity or 0 }}">{{ e.name }}</option>{% endfor %}
             </select>
           </td>
+          <td><span class="available-qty text-muted">—</span></td>
           <td><input name="quantity[]" type="number" min="1" class="form-control" value="1"></td>
           <td><button type="button" class="btn btn-sm btn-danger remove-row">X</button></td>
         </tr>
@@ -81,6 +89,25 @@ document.addEventListener('click', function(e) {
     const rows = document.querySelectorAll('.item-row');
     if (rows.length > 1) {
       e.target.closest('.item-row').remove();
+    }
+  }
+});
+
+// Update available quantity when equipment is selected
+document.addEventListener('change', function(e) {
+  if (e.target.classList.contains('equipment-select')) {
+    const row = e.target.closest('.item-row');
+    const availableSpan = row.querySelector('.available-qty');
+    const selectedOption = e.target.options[e.target.selectedIndex];
+    const available = selectedOption.getAttribute('data-available');
+    if (available !== null && e.target.value) {
+      availableSpan.textContent = available;
+      availableSpan.classList.remove('text-muted');
+      availableSpan.classList.add('text-info', 'fw-bold');
+    } else {
+      availableSpan.textContent = '—';
+      availableSpan.classList.remove('text-info', 'fw-bold');
+      availableSpan.classList.add('text-muted');
     }
   }
 });

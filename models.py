@@ -33,6 +33,7 @@ class Station(db.Model):
 class Equipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
+    available_quantity = db.Column(db.Integer, default=0)  # Tồn kho - available inventory
 
 class Person(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -109,6 +110,9 @@ def init_db():
         # Add `person_name` to store_return_record if missing
         if not _has_column('store_return_record', 'person_name'):
             db.session.execute(text("ALTER TABLE store_return_record ADD COLUMN person_name TEXT"))
+        # Add `available_quantity` to equipment if missing
+        if not _has_column('equipment', 'available_quantity'):
+            db.session.execute(text("ALTER TABLE equipment ADD COLUMN available_quantity INTEGER DEFAULT 0"))
         db.session.commit()
     # Create default admin user if not exists
     admin = User.query.filter_by(username='admin').first()

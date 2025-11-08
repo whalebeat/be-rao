@@ -186,7 +186,7 @@
         </div>
       </form>
       <table class="table table-striped">
-        <thead><tr><th>ID</th><th>Tên</th><th>Thao tác</th></tr></thead>
+        <thead><tr><th>ID</th><th>Tên</th><th>Tồn kho</th><th>Thao tác</th></tr></thead>
         <tbody>
           {% for e in equipments %}
           <tr>
@@ -195,6 +195,12 @@
               <form method="post" action="{{ url_for('admin_edit_equipment', equipment_id=e.id) }}" style="display:inline;">
                 <input type="text" name="name" value="{{ e.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
                 <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin_set_available_quantity', equipment_id=e.id) }}" style="display:inline;">
+                <input type="number" name="available_quantity" value="{{ e.available_quantity or 0 }}" class="form-control form-control-sm d-inline-block" style="width:100px;" min="0">
+                <button type="submit" class="btn btn-sm btn-outline-success">Cập nhật</button>
               </form>
             </td>
             <td>

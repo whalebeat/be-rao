@@ -17,11 +17,12 @@
   {% if selected_marathon %}
     <h5>Thống kê</h5>
     <table class="table">
-      <thead><tr><th>Tên</th><th>Xuất kho</th><th>Đã giao</th><th>Đã trả</th><th>Nhập kho</th><th>Còn thiếu</th></tr></thead>
+      <thead><tr><th>Tên</th><th>Tồn kho</th><th>Xuất kho</th><th>Đã giao</th><th>Đã trả</th><th>Nhập kho</th><th>Còn thiếu</th></tr></thead>
       <tbody>
         {% for r in equipment_summary %}
         <tr {% if r.remaining>0 %}class="table-warning"{% endif %}>
           <td>{{ r.equipment }}</td>
+          <td><span class="badge bg-info">{{ r.available }}</span></td>
           <td>{{ r.store_issued }}</td>
           <td>{{ r.issued }}</td>
           <td>{{ r.returned }}</td>
