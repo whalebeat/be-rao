@@ -82,38 +82,60 @@ class StoreReturnRecord(db.Model):
 
 def init_db():
     db.create_all()
-    # Ensure older SQLite databases get new columns added without manual migrations.
-    # If the app is using SQLite and the `created_by` column was added to the model
-    # after the DB file was created, add the column at startup so queries that
-    # reference it won't fail with "no such column".
+    # Ensure older databases get new columns added without manual migrations.
     try:
         engine_url = str(db.engine.url)
     except Exception:
         engine_url = ''
-    if 'sqlite' in engine_url:
-        from sqlalchemy import text
-
-        def _has_column(table, colname):
-            res = db.session.execute(text(f"PRAGMA table_info({table})")).fetchall()
-            # PRAGMA returns rows where the second column (index 1) is the column name
-            return any(r[1] == colname for r in res)
-
+    
+    from sqlalchemy import text, inspect
+    
+    def _has_column(table, colname):
+        """Check if a column exists in a table (works for both SQLite and PostgreSQL)"""
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns(table)]
+        return colname in columns
+    
+    try:
         # Add `created_by` to issue_record if missing
         if not _has_column('issue_record', 'created_by'):
-            db.session.execute(text("ALTER TABLE issue_record ADD COLUMN created_by TEXT"))
+            if 'sqlite' in engine_url:
+                db.session.execute(text("ALTER TABLE issue_record ADD COLUMN created_by TEXT"))
+            else:
+                db.session.execute(text("ALTER TABLE issue_record ADD COLUMN created_by VARCHAR(100)"))
+        
         # Add `created_by` to return_record if missing
         if not _has_column('return_record', 'created_by'):
-            db.session.execute(text("ALTER TABLE return_record ADD COLUMN created_by TEXT"))
+            if 'sqlite' in engine_url:
+                db.session.execute(text("ALTER TABLE return_record ADD COLUMN created_by TEXT"))
+            else:
+                db.session.execute(text("ALTER TABLE return_record ADD COLUMN created_by VARCHAR(100)"))
+        
         # Add `person_name` to store_issue_record if missing
         if not _has_column('store_issue_record', 'person_name'):
-            db.session.execute(text("ALTER TABLE store_issue_record ADD COLUMN person_name TEXT"))
+            if 'sqlite' in engine_url:
+                db.session.execute(text("ALTER TABLE store_issue_record ADD COLUMN person_name TEXT"))
+            else:
+                db.session.execute(text("ALTER TABLE store_issue_record ADD COLUMN person_name VARCHAR(200)"))
+        
         # Add `person_name` to store_return_record if missing
         if not _has_column('store_return_record', 'person_name'):
-            db.session.execute(text("ALTER TABLE store_return_record ADD COLUMN person_name TEXT"))
+            if 'sqlite' in engine_url:
+                db.session.execute(text("ALTER TABLE store_return_record ADD COLUMN person_name TEXT"))
+            else:
+                db.session.execute(text("ALTER TABLE store_return_record ADD COLUMN person_name VARCHAR(200)"))
+        
         # Add `available_quantity` to equipment if missing
         if not _has_column('equipment', 'available_quantity'):
-            db.session.execute(text("ALTER TABLE equipment ADD COLUMN available_quantity INTEGER DEFAULT 0"))
+            if 'sqlite' in engine_url:
+                db.session.execute(text("ALTER TABLE equipment ADD COLUMN available_quantity INTEGER DEFAULT 0"))
+            else:
+                db.session.execute(text("ALTER TABLE equipment ADD COLUMN available_quantity INTEGER DEFAULT 0"))
+        
         db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migration warning: {e}")
     # Create default admin user if not exists
     admin = User.query.filter_by(username='admin').first()
     if not admin:
