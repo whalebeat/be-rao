@@ -7,25 +7,127 @@
 
   <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue-records" type="button">Lịch sử Giao đồ</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return-records" type="button">Lịch sử Trả đồ</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="marathons-tab" data-bs-toggle="tab" data-bs-target="#marathons" type="button">Giải chạy</button>
+      <button class="nav-link active" id="equipments-tab" data-bs-toggle="tab" data-bs-target="#equipments-manage" type="button">Thiết bị</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="stations-tab" data-bs-toggle="tab" data-bs-target="#stations" type="button">Trạm</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="equipments-tab" data-bs-toggle="tab" data-bs-target="#equipments-manage" type="button">Thiết bị</button>
+      <button class="nav-link" id="marathons-tab" data-bs-toggle="tab" data-bs-target="#marathons" type="button">Giải chạy</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="issue-tab" data-bs-toggle="tab" data-bs-target="#issue-records" type="button">Lịch sử Giao đồ</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="return-tab" data-bs-toggle="tab" data-bs-target="#return-records" type="button">Lịch sử Trả đồ</button>
     </li>
   </ul>
 
   <div class="tab-content" id="adminTabsContent">
+    <!-- Equipments Tab -->
+    <div class="tab-pane fade show active" id="equipments-manage" role="tabpanel">
+      <h5>Quản lý Thiết bị</h5>
+      <form method="post" action="{{ url_for('admin_add_equipment_form') }}" class="mb-3">
+        <div class="input-group">
+          <input type="text" name="name" class="form-control" placeholder="Tên thiết bị mới" required>
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </div>
+      </form>
+      <table class="table table-striped">
+        <thead><tr><th>ID</th><th>Tên</th><th>Tồn kho</th><th>Thao tác</th></tr></thead>
+        <tbody>
+          {% for e in equipments %}
+          <tr>
+            <td>{{ e.id }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_edit_equipment', equipment_id=e.id) }}" style="display:inline;">
+                <input type="text" name="name" value="{{ e.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin_set_available_quantity', equipment_id=e.id) }}" style="display:inline;">
+                <input type="number" name="available_quantity" value="{{ e.available_quantity or 0 }}" class="form-control form-control-sm d-inline-block" style="width:100px;" min="0">
+                <button type="submit" class="btn btn-sm btn-outline-success">Cập nhật</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin_delete_equipment', equipment_id=e.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa thiết bị này?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Stations Tab -->
+    <div class="tab-pane fade" id="stations" role="tabpanel">
+      <h5>Quản lý Trạm</h5>
+      <form method="post" action="{{ url_for('admin_add_station_form') }}" class="mb-3">
+        <div class="input-group">
+          <input type="text" name="name" class="form-control" placeholder="Tên trạm mới" required>
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </div>
+      </form>
+      <table class="table table-striped">
+        <thead><tr><th>ID</th><th>Tên</th><th>Thao tác</th></tr></thead>
+        <tbody>
+          {% for s in stations %}
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_edit_station', station_id=s.id) }}" style="display:inline;">
+                <input type="text" name="name" value="{{ s.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin_delete_station', station_id=s.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa trạm này?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Marathons Tab -->
+    <div class="tab-pane fade" id="marathons" role="tabpanel">
+      <h5>Quản lý Giải chạy</h5>
+      <form method="post" action="{{ url_for('admin_add_marathon') }}" class="mb-3">
+        <div class="input-group">
+          <input type="text" name="name" class="form-control" placeholder="Tên giải chạy mới" required>
+          <button type="submit" class="btn btn-primary">Thêm</button>
+        </div>
+      </form>
+      <table class="table table-striped">
+        <thead><tr><th>ID</th><th>Tên</th><th>Thao tác</th></tr></thead>
+        <tbody>
+          {% for m in marathons %}
+          <tr>
+            <td>{{ m.id }}</td>
+            <td>
+              <form method="post" action="{{ url_for('admin_edit_marathon', marathon_id=m.id) }}" style="display:inline;">
+                <input type="text" name="name" value="{{ m.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin_delete_marathon', marathon_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa giải chạy này?');">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
     <!-- Issue Records Tab -->
-    <div class="tab-pane fade show active" id="issue-records" role="tabpanel">
+    <div class="tab-pane fade" id="issue-records" role="tabpanel">
       <h5>Lịch sử Giao đồ (100 bản ghi)</h5>
       <div class="table-responsive">
         <table class="table table-sm table-striped">
@@ -112,107 +214,6 @@
       </div>
     </div>
 
-    <!-- Marathons Tab -->
-    <div class="tab-pane fade" id="marathons" role="tabpanel">
-      <h5>Quản lý Giải chạy</h5>
-      <form method="post" action="{{ url_for('admin_add_marathon') }}" class="mb-3">
-        <div class="input-group">
-          <input type="text" name="name" class="form-control" placeholder="Tên giải chạy mới" required>
-          <button type="submit" class="btn btn-primary">Thêm</button>
-        </div>
-      </form>
-      <table class="table table-striped">
-        <thead><tr><th>ID</th><th>Tên</th><th>Thao tác</th></tr></thead>
-        <tbody>
-          {% for m in marathons %}
-          <tr>
-            <td>{{ m.id }}</td>
-            <td>
-              <form method="post" action="{{ url_for('admin_edit_marathon', marathon_id=m.id) }}" style="display:inline;">
-                <input type="text" name="name" value="{{ m.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
-              </form>
-            </td>
-            <td>
-              <form method="post" action="{{ url_for('admin_delete_marathon', marathon_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa giải chạy này?');">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Stations Tab -->
-    <div class="tab-pane fade" id="stations" role="tabpanel">
-      <h5>Quản lý Trạm</h5>
-      <form method="post" action="{{ url_for('admin_add_station_form') }}" class="mb-3">
-        <div class="input-group">
-          <input type="text" name="name" class="form-control" placeholder="Tên trạm mới" required>
-          <button type="submit" class="btn btn-primary">Thêm</button>
-        </div>
-      </form>
-      <table class="table table-striped">
-        <thead><tr><th>ID</th><th>Tên</th><th>Thao tác</th></tr></thead>
-        <tbody>
-          {% for s in stations %}
-          <tr>
-            <td>{{ s.id }}</td>
-            <td>
-              <form method="post" action="{{ url_for('admin_edit_station', station_id=s.id) }}" style="display:inline;">
-                <input type="text" name="name" value="{{ s.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
-              </form>
-            </td>
-            <td>
-              <form method="post" action="{{ url_for('admin_delete_station', station_id=s.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa trạm này?');">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Equipments Tab -->
-    <div class="tab-pane fade" id="equipments-manage" role="tabpanel">
-      <h5>Quản lý Thiết bị</h5>
-      <form method="post" action="{{ url_for('admin_add_equipment_form') }}" class="mb-3">
-        <div class="input-group">
-          <input type="text" name="name" class="form-control" placeholder="Tên thiết bị mới" required>
-          <button type="submit" class="btn btn-primary">Thêm</button>
-        </div>
-      </form>
-      <table class="table table-striped">
-        <thead><tr><th>ID</th><th>Tên</th><th>Tồn kho</th><th>Thao tác</th></tr></thead>
-        <tbody>
-          {% for e in equipments %}
-          <tr>
-            <td>{{ e.id }}</td>
-            <td>
-              <form method="post" action="{{ url_for('admin_edit_equipment', equipment_id=e.id) }}" style="display:inline;">
-                <input type="text" name="name" value="{{ e.name }}" class="form-control form-control-sm d-inline-block" style="width:auto;">
-                <button type="submit" class="btn btn-sm btn-outline-primary">Lưu</button>
-              </form>
-            </td>
-            <td>
-              <form method="post" action="{{ url_for('admin_set_available_quantity', equipment_id=e.id) }}" style="display:inline;">
-                <input type="number" name="available_quantity" value="{{ e.available_quantity or 0 }}" class="form-control form-control-sm d-inline-block" style="width:100px;" min="0">
-                <button type="submit" class="btn btn-sm btn-outline-success">Cập nhật</button>
-              </form>
-            </td>
-            <td>
-              <form method="post" action="{{ url_for('admin_delete_equipment', equipment_id=e.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa thiết bị này?');">
-                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
   </div>
 </div>
 {% endblock %}

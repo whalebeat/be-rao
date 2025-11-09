@@ -269,12 +269,14 @@ def report():
             issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
             returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
             diff = issued - returned
-            equipment_summary.append({
-                'equipment': eq.name,
-                'issued': int(issued), 
-                'returned': int(returned), 
-                'remaining': int(diff)
-            })
+            # Only include equipment with activity (issued or returned > 0)
+            if issued > 0 or returned > 0:
+                equipment_summary.append({
+                    'equipment': eq.name,
+                    'issued': int(issued), 
+                    'returned': int(returned), 
+                    'remaining': int(diff)
+                })
         for st in stations:
             items = []
             for eq in equipments:
