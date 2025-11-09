@@ -19,10 +19,10 @@
   <form method="post" id="store-issue-form">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
-        <label class="form-label">Giải chạy</label>
+        <label class="form-label">Giải chạy <span class="text-muted">(Tùy chọn)</span></label>
         <div class="input-group">
           <select name="marathon" id="marathon-select" class="form-select">
-            <option value="">-- Chọn Giải chạy --</option>
+            <option value="">-- Không chọn (Ngoài giải) --</option>
             {% for m in marathons %}
               <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}

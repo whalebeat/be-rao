@@ -19,9 +19,9 @@
   <form method="post" id="store-return-form">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
-        <label class="form-label">Giải chạy</label>
+        <label class="form-label">Giải chạy <span class="text-muted">(Tùy chọn)</span></label>
         <select name="marathon" id="marathon-select-return" class="form-select" onchange="window.location.href='{{ url_for('store_return') }}?marathon=' + this.value">
-          <option value="">-- Chọn Giải chạy --</option>
+          <option value="">-- Không chọn (Ngoài giải) --</option>
           {% for m in marathons %}<option value="{{ m.id }}" {% if selected_marathon and selected_marathon==m.id|string %}selected{% endif %}>{{ m.name }}</option>{% endfor %}
         </select>
       </div>
@@ -37,26 +37,71 @@
       </div>
     </div>
 
-    <h5>Đồ có thể nhập kho</h5>
-    {% if unreturned %}
-      <table class="table" id="return-table">
-        <thead><tr><th>Tên thiết bị</th><th>Số lượng có sẵn</th><th>Số lượng nhập kho</th></tr></thead>
+    {% if selected_marathon %}
+      <h5>Đồ có thể nhập kho từ giải</h5>
+      {% if unreturned %}
+        <table class="table" id="return-table">
+          <thead><tr><th>Tên thiết bị</th><th>Số lượng có sẵn</th><th>Số lượng nhập kho</th></tr></thead>
+          <tbody>
+            {% for it in unreturned %}
+            <tr>
+              <td>{{ it.equipment }}<input type="hidden" name="equipment[]" value="{{ it.equipment_id }}"></td>
+              <td>{{ it.available }}</td>
+              <td><input name="quantity[]" type="number" min="0" max="{{ it.available }}" value="0" class="form-control"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Lưu</button>
+        </div>
+      {% else %}
+        <p class="text-muted">Không có đồ nào cần nhập kho cho giải này.</p>
+      {% endif %}
+    {% else %}
+      <h5>Danh sách thiết bị nhập kho</h5>
+      <table class="table" id="equipment-table">
+        <thead><tr><th>Tên thiết bị</th><th>Số lượng</th><th></th></tr></thead>
         <tbody>
-          {% for it in unreturned %}
-          <tr>
-            <td>{{ it.equipment }}<input type="hidden" name="equipment[]" value="{{ it.equipment_id }}"></td>
-            <td>{{ it.available }}</td>
-            <td><input name="quantity[]" type="number" min="0" max="{{ it.available }}" value="0" class="form-control"></td>
+          <tr class="item-row">
+            <td>
+              <select name="equipment[]" class="form-select equipment-select">
+                <option value="">-- Chọn --</option>
+                {% for e in equipments %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+              </select>
+            </td>
+            <td><input name="quantity[]" type="number" min="1" class="form-control" value="1"></td>
+            <td><button type="button" class="btn btn-sm btn-danger remove-row">X</button></td>
           </tr>
-          {% endfor %}
         </tbody>
       </table>
       <div class="d-flex gap-2">
+        <button type="button" id="add-row" class="btn btn-sm btn-outline-primary">+ Thêm hàng mới</button>
         <button type="submit" class="btn btn-primary">Lưu</button>
       </div>
-    {% else %}
-      <p class="text-muted">Chọn Giải chạy để xem đồ có thể nhập kho.</p>
     {% endif %}
   </form>
 </div>
+
+<script>
+// Only add dynamic row functionality when marathon is not selected
+if (!document.getElementById('return-table')) {
+  document.getElementById('add-row').addEventListener('click', function() {
+    const table = document.querySelector('#equipment-table tbody');
+    const newRow = document.querySelector('.item-row').cloneNode(true);
+    newRow.querySelectorAll('input').forEach(input => input.value = input.type === 'number' ? '1' : '');
+    newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+    table.appendChild(newRow);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-row')) {
+      const rows = document.querySelectorAll('.item-row');
+      if (rows.length > 1) {
+        e.target.closest('.item-row').remove();
+      }
+    }
+  });
+}
+</script>
 {% endblock %}

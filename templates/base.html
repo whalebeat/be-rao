@@ -29,6 +29,10 @@
           
           <a class="btn btn-outline-success" href="{{ url_for('report') }}">📊 Xem Báo Cáo</a>
           
+          {% if user and user.role in ['admin', 'storekeeper'] %}
+            <a class="btn btn-outline-info" href="{{ url_for('reconciliation_report') }}">🔍 Báo Cáo Đối Soát</a>
+          {% endif %}
+          
           {% if user and user.role == 'admin' %}
             <a class="btn btn-outline-warning" href="{{ url_for('admin_dashboard') }}">⚙️ Quản Lý Hệ Thống</a>
             <a class="btn btn-outline-info" href="{{ url_for('admin_users') }}">👥 Quản Lý Người Dùng</a>

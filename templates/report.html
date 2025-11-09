@@ -17,16 +17,13 @@
   {% if selected_marathon %}
     <h5>Thống kê</h5>
     <table class="table">
-      <thead><tr><th>Tên</th><th>Tồn kho</th><th>Xuất kho</th><th>Đã giao</th><th>Đã trả</th><th>Nhập kho</th><th>Còn thiếu</th></tr></thead>
+      <thead><tr><th>Tên</th><th>Đã giao</th><th>Đã trả</th><th>Còn thiếu</th></tr></thead>
       <tbody>
         {% for r in equipment_summary %}
         <tr {% if r.remaining>0 %}class="table-warning"{% endif %}>
           <td>{{ r.equipment }}</td>
-          <td><span class="badge bg-info">{{ r.available }}</span></td>
-          <td>{{ r.store_issued }}</td>
           <td>{{ r.issued }}</td>
           <td>{{ r.returned }}</td>
-          <td>{{ r.store_returned }}</td>
           <td>{{ r.remaining }}</td>
         </tr>
         {% endfor %}
@@ -64,14 +61,10 @@
           {% for t in transactions %}
           <tr>
             <td>
-              {% if t.type == 'store_issue' %}
-                <span class="badge bg-info">Xuất kho</span>
-              {% elif t.type == 'issue' %}
+              {% if t.type == 'issue' %}
                 <span class="badge bg-primary">Giao</span>
               {% elif t.type == 'return' %}
                 <span class="badge bg-success">Trả</span>
-              {% elif t.type == 'store_return' %}
-                <span class="badge bg-secondary">Nhập kho</span>
               {% endif %}
             </td>
             <td>{{ t.timestamp.strftime('%Y-%m-%d %H:%M') if t.timestamp else '—' }}</td>

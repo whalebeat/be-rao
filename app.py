@@ -266,18 +266,13 @@ def report():
     stations = Station.query.order_by(Station.name).all()
     if marathon_id:
         for eq in equipments:
-            store_issued = db.session.query(func.sum(StoreIssueRecord.quantity)).filter(StoreIssueRecord.equipment_id==eq.id, StoreIssueRecord.marathon_id==marathon_id).scalar() or 0
             issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
             returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
-            store_returned = db.session.query(func.sum(StoreReturnRecord.quantity)).filter(StoreReturnRecord.equipment_id==eq.id, StoreReturnRecord.marathon_id==marathon_id).scalar() or 0
             diff = issued - returned
             equipment_summary.append({
                 'equipment': eq.name,
-                'available': eq.available_quantity or 0,
-                'store_issued': int(store_issued),
                 'issued': int(issued), 
                 'returned': int(returned), 
-                'store_returned': int(store_returned),
                 'remaining': int(diff)
             })
         for st in stations:
@@ -288,23 +283,9 @@ def report():
                 diff = issued - returned
                 if diff>0: items.append({'equipment': eq.name, 'missing': int(diff)})
             if items: station_details.append({'station': st.name, 'items': items})
-        # Get transaction history
-        store_issue_records = StoreIssueRecord.query.filter_by(marathon_id=marathon_id).all()
+        # Get transaction history (only issue and return records)
         issue_records = IssueRecord.query.filter_by(marathon_id=marathon_id).all()
         return_records = ReturnRecord.query.filter_by(marathon_id=marathon_id).all()
-        store_return_records = StoreReturnRecord.query.filter_by(marathon_id=marathon_id).all()
-        
-        for rec in store_issue_records:
-            equipment = Equipment.query.get(rec.equipment_id)
-            transactions.append({
-                'type': 'store_issue',
-                'timestamp': rec.timestamp,
-                'station': None,
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
         
         for rec in issue_records:
             station = Station.query.get(rec.station_id) if rec.station_id else None
@@ -332,12 +313,66 @@ def report():
                 'created_by': rec.created_by
             })
         
+        # Sort transactions by timestamp descending (newest first)
+        transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
+    return render_template('report.html', marathons=marathons, equipment_summary=equipment_summary, station_details=station_details, selected_marathon=marathon_id, transactions=transactions, user=user)
+
+@app.route('/reconciliation_report', methods=['GET'])
+@admin_or_storekeeper_required
+def reconciliation_report():
+    user = get_current_user()
+    marathon_id = request.args.get('marathon') or None
+    marathons = Marathon.query.order_by(Marathon.name).all()
+    equipment_summary = []; store_transactions = []
+    from sqlalchemy import func
+    equipments = Equipment.query.order_by(Equipment.name).all()
+    
+    if marathon_id:
+        # Show statistics and records for selected marathon
+        for eq in equipments:
+            store_issued = db.session.query(func.sum(StoreIssueRecord.quantity)).filter(StoreIssueRecord.equipment_id==eq.id, StoreIssueRecord.marathon_id==marathon_id).scalar() or 0
+            issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
+            returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
+            store_returned = db.session.query(func.sum(StoreReturnRecord.quantity)).filter(StoreReturnRecord.equipment_id==eq.id, StoreReturnRecord.marathon_id==marathon_id).scalar() or 0
+            
+            # Calculate differences
+            store_vs_issued = store_issued - issued  # Should be 0 if balanced
+            returned_vs_store = returned - store_returned  # Should be 0 if balanced
+            
+            equipment_summary.append({
+                'equipment': eq.name,
+                'store_issued': int(store_issued),
+                'issued': int(issued), 
+                'store_vs_issued_diff': int(store_vs_issued),
+                'returned': int(returned), 
+                'store_returned': int(store_returned),
+                'returned_vs_store_diff': int(returned_vs_store)
+            })
+        
+        # Get store transaction history for selected marathon
+        store_issue_records = StoreIssueRecord.query.filter_by(marathon_id=marathon_id).order_by(StoreIssueRecord.timestamp.desc()).all()
+        store_return_records = StoreReturnRecord.query.filter_by(marathon_id=marathon_id).order_by(StoreReturnRecord.timestamp.desc()).all()
+        
+        for rec in store_issue_records:
+            equipment = Equipment.query.get(rec.equipment_id)
+            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
+            store_transactions.append({
+                'type': 'store_issue',
+                'timestamp': rec.timestamp,
+                'marathon': marathon.name if marathon else '-----',
+                'equipment': equipment.name if equipment else None,
+                'quantity': rec.quantity,
+                'person': rec.person_name,
+                'created_by': rec.created_by
+            })
+        
         for rec in store_return_records:
             equipment = Equipment.query.get(rec.equipment_id)
-            transactions.append({
+            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
+            store_transactions.append({
                 'type': 'store_return',
                 'timestamp': rec.timestamp,
-                'station': None,
+                'marathon': marathon.name if marathon else '-----',
                 'equipment': equipment.name if equipment else None,
                 'quantity': rec.quantity,
                 'person': rec.person_name,
@@ -345,8 +380,43 @@ def report():
             })
         
         # Sort transactions by timestamp descending (newest first)
-        transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
-    return render_template('report.html', marathons=marathons, equipment_summary=equipment_summary, station_details=station_details, selected_marathon=marathon_id, transactions=transactions, user=user)
+        store_transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
+    else:
+        # Show 100 most recent store issue/return records when no marathon is selected
+        store_issue_records = StoreIssueRecord.query.order_by(StoreIssueRecord.timestamp.desc()).limit(100).all()
+        store_return_records = StoreReturnRecord.query.order_by(StoreReturnRecord.timestamp.desc()).limit(100).all()
+        
+        for rec in store_issue_records:
+            equipment = Equipment.query.get(rec.equipment_id)
+            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
+            store_transactions.append({
+                'type': 'store_issue',
+                'timestamp': rec.timestamp,
+                'marathon': marathon.name if marathon else '-----',
+                'equipment': equipment.name if equipment else None,
+                'quantity': rec.quantity,
+                'person': rec.person_name,
+                'created_by': rec.created_by
+            })
+        
+        for rec in store_return_records:
+            equipment = Equipment.query.get(rec.equipment_id)
+            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
+            store_transactions.append({
+                'type': 'store_return',
+                'timestamp': rec.timestamp,
+                'marathon': marathon.name if marathon else '-----',
+                'equipment': equipment.name if equipment else None,
+                'quantity': rec.quantity,
+                'person': rec.person_name,
+                'created_by': rec.created_by
+            })
+        
+        # Sort transactions by timestamp descending (newest first)
+        store_transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
+    
+    return render_template('reconciliation_report.html', marathons=marathons, equipment_summary=equipment_summary, 
+                         selected_marathon=marathon_id, store_transactions=store_transactions, user=user)
 
 @app.route('/store_issue', methods=['GET','POST'])
 @login_required
@@ -428,7 +498,13 @@ def store_return():
                 unreturned.append({'equipment_id': r.equipment_id, 'equipment': eq.name if eq else '—', 'available': int(available)})
     
     if request.method=='POST':
-        marathon_id = request.form.get('marathon') or None
+        # Get marathon_id from form data (for non-race returns) or from query string (for race-specific returns)
+        form_marathon_id = request.form.get('marathon')
+        if form_marathon_id:
+            marathon_id = form_marathon_id
+        else:
+            marathon_id = None
+        
         person_name = request.form.get('person') or request.form.get('new_person')
         if person_name:
             person = Person.query.filter_by(name=person_name).first()
@@ -450,7 +526,11 @@ def store_return():
             db.session.add(r)
         db.session.commit()
         flash('Nhập kho thành công!', 'success')
-        return redirect(url_for('store_return', marathon=marathon_id))
+        # Redirect back to the same page with or without marathon parameter
+        if marathon_id:
+            return redirect(url_for('store_return', marathon=marathon_id))
+        else:
+            return redirect(url_for('store_return'))
     
     return render_template('store_return.html', marathons=marathons, equipments=equipments, persons=persons,
                          unreturned=unreturned, selected_marathon=marathon_id, user=user)
