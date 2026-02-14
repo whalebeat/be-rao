@@ -632,9 +632,9 @@ def admin_delete_user(user_id):
 @admin_required
 def admin_dashboard():
     user = get_current_user()
-    marathons = Marathon.query.order_by(Marathon.name).all()
-    stations = Station.query.order_by(Station.name).all()
-    equipments = Equipment.query.order_by(Equipment.name).all()
+    marathons = Marathon.query.order_by(Marathon.id).all()
+    stations = Station.query.order_by(Station.id).all()
+    equipments = Equipment.query.order_by(Equipment.id).all()
     issue_records = IssueRecord.query.order_by(IssueRecord.timestamp.desc()).limit(100).all()
     return_records = ReturnRecord.query.order_by(ReturnRecord.timestamp.desc()).limit(100).all()
     return render_template('admin_dashboard.html', marathons=marathons, stations=stations, equipments=equipments, issue_records=issue_records, return_records=return_records, user=user)
