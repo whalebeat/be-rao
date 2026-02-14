@@ -41,7 +41,7 @@
       <h5>Đồ có thể nhập kho từ giải</h5>
       {% if unreturned %}
         <table class="table" id="return-table">
-          <thead><tr><th>Tên thiết bị</th><th>Số lượng có sẵn</th><th>Số lượng nhập kho</th></tr></thead>
+          <thead><tr><th>Tên thiết bị</th><th>Số lượng có thể nhập kho</th><th>Số lượng nhập kho</th></tr></thead>
           <tbody>
             {% for it in unreturned %}
             <tr>
@@ -56,7 +56,7 @@
           <button type="submit" class="btn btn-primary">Lưu</button>
         </div>
       {% else %}
-        <p class="text-muted">Không có đồ nào cần nhập kho cho giải này.</p>
+        <p class="text-muted">Không có đồ nào có thể nhập kho cho giải này. (Tất cả đồ đã xuất kho đã được nhập kho lại)</p>
       {% endif %}
     {% else %}
       <h5>Danh sách thiết bị nhập kho</h5>

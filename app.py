@@ -471,30 +471,22 @@ def store_return():
     unreturned = []
     if marathon_id:
         from sqlalchemy import func
-        # Calculate: store_issued - issue + return - store_returned
+        # Calculate: store_issued - store_returned (independent of user issue/return)
         store_issued_q = db.session.query(StoreIssueRecord.equipment_id, func.sum(StoreIssueRecord.quantity).label('store_issued')).filter(StoreIssueRecord.marathon_id==marathon_id).group_by(StoreIssueRecord.equipment_id).subquery()
-        issued_q = db.session.query(IssueRecord.equipment_id, func.sum(IssueRecord.quantity).label('issued')).filter(IssueRecord.marathon_id==marathon_id).group_by(IssueRecord.equipment_id).subquery()
-        returned_q = db.session.query(ReturnRecord.equipment_id, func.sum(ReturnRecord.quantity).label('returned')).filter(ReturnRecord.marathon_id==marathon_id).group_by(ReturnRecord.equipment_id).subquery()
         store_returned_q = db.session.query(StoreReturnRecord.equipment_id, func.sum(StoreReturnRecord.quantity).label('store_returned')).filter(StoreReturnRecord.marathon_id==marathon_id).group_by(StoreReturnRecord.equipment_id).subquery()
         
         base_query = db.session.query(
             store_issued_q.c.equipment_id,
             store_issued_q.c.store_issued,
-            issued_q.c.issued,
-            returned_q.c.returned,
             store_returned_q.c.store_returned
-        ).outerjoin(issued_q, store_issued_q.c.equipment_id==issued_q.c.equipment_id
-        ).outerjoin(returned_q, store_issued_q.c.equipment_id==returned_q.c.equipment_id
         ).outerjoin(store_returned_q, store_issued_q.c.equipment_id==store_returned_q.c.equipment_id)
         
         rows = base_query.all()
         for r in rows:
             store_issued = r.store_issued or 0
-            issued = r.issued or 0
-            returned = r.returned or 0
             store_returned = r.store_returned or 0
-            # Available to return to store = returned from stations - already returned to store
-            available = returned - store_returned
+            # Available to return to store = store_issued - already returned to store
+            available = store_issued - store_returned
             if available > 0:
                 eq = Equipment.query.get(r.equipment_id)
                 unreturned.append({'equipment_id': r.equipment_id, 'equipment': eq.name if eq else '—', 'available': int(available)})
