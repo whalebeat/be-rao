@@ -15,7 +15,7 @@
 
   <p class="text-muted">Cập nhật số lượng tồn kho cho tất cả thiết bị</p>
 
-  <form method="post" id="inventory-form">
+  <form method="post" id="inventory-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="table-responsive">
       <table class="table table-striped table-hover">
         <thead>

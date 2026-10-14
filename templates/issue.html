@@ -9,7 +9,7 @@
     </a>
     {% endif %}
   </div>
-  <form method="post" id="issue-form">
+  <form method="post" id="issue-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
         <label class="form-label">Giải chạy</label>
@@ -20,7 +20,9 @@
               <option value="{{ m.id }}">{{ m.name }}</option>
             {% endfor %}
           </select>
+          {% if user and user.role in ['admin', 'storekeeper'] %}
           <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addMarathonModal">Thêm</button>
+          {% endif %}
         </div>
       </div>
       <div class="col-md-4">

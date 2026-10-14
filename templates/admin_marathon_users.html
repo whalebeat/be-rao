@@ -5,7 +5,7 @@
   <p class="text-muted">Chọn giải chạy và phân công nhiều người dùng cùng lúc</p>
   
   {% if marathons %}
-  <form method="post">
+  <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row mb-3">
       <div class="col-md-6">
         <label class="form-label fw-bold">Chọn Giải Chạy:</label>

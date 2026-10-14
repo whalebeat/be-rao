@@ -16,7 +16,7 @@
       {% endif %}
     </div>
   </div>
-  <form method="post" id="store-return-form">
+  <form method="post" id="store-return-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
         <label class="form-label">Giải chạy <span class="text-muted">(Tùy chọn)</span></label>

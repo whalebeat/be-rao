@@ -11,7 +11,7 @@
     {% endif %}
   {% endwith %}
 
-  <form method="POST" class="form-box">
+  <form method="POST" class="form-box"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
       <label for="username">Tên đăng nhập:</label>
       <input type="text" id="username" name="username" required autofocus>

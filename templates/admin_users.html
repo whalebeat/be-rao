@@ -44,7 +44,7 @@
           {% endif %}
           <a href="{{ url_for('admin_reset_password', user_id=u.id) }}" class="btn btn-sm btn-warning">🔑 Đặt Lại Mật Khẩu</a>
           {% if u.id != user.id %}
-          <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa người dùng {{ u.username }}?');">
+          <form method="POST" action="{{ url_for('admin_delete_user', user_id=u.id) }}" style="display:inline;" onsubmit='return confirm({{ ("Bạn có chắc muốn xóa người dùng " ~ u.username ~ "?")|tojson }});'><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-danger">🗑️ Xóa</button>
           </form>
           {% endif %}

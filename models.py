@@ -1,7 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import secrets
 
 db = SQLAlchemy()
+
+# Old installs seeded this password; users still on it are forced to change it at login
+DEFAULT_ADMIN_PASSWORD = 'admin123'
 
 # Association table for User-Marathon many-to-many relationship
 user_marathon = db.Table('user_marathon',
@@ -136,10 +141,15 @@ def init_db():
     except Exception as e:
         db.session.rollback()
         print(f"Migration warning: {e}")
-    # Create default admin user if not exists
-    admin = User.query.filter_by(username='admin').first()
-    if not admin:
-        admin = User(username='admin', role='admin')
-        admin.set_password('admin123')
+    # Create the first admin user if there are no admins yet
+    if not User.query.filter_by(role='admin').first():
+        username = os.getenv('ADMIN_USERNAME', 'admin')
+        password = os.getenv('ADMIN_PASSWORD')
+        if not password:
+            password = secrets.token_urlsafe(12)
+            print(f"Created admin user '{username}' with generated password: {password}")
+        admin = User.query.filter_by(username=username).first() or User(username=username)
+        admin.role = 'admin'
+        admin.set_password(password)
         db.session.add(admin)
         db.session.commit()

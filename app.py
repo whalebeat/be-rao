@@ -1,20 +1,85 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash
-from models import db, init_db, Station, Equipment, Person, Marathon, IssueRecord, ReturnRecord, User, StoreIssueRecord, StoreReturnRecord
-from datetime import datetime
+import hmac
+import secrets
+import time
+from collections import defaultdict
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session, flash, abort
+from werkzeug.middleware.proxy_fix import ProxyFix
+from sqlalchemy import func
+from models import db, init_db, Station, Equipment, Person, Marathon, IssueRecord, ReturnRecord, User, StoreIssueRecord, StoreReturnRecord, DEFAULT_ADMIN_PASSWORD
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from functools import wraps
 load_dotenv()
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 database_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://","postgresql://",1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+secret_key = os.getenv("SECRET_KEY")
+if not secret_key:
+    # Random per-process key: sessions don't survive restarts, but cookies can't be forged.
+    print("WARNING: SECRET_KEY is not set; using a random key. Set SECRET_KEY in production.")
+    secret_key = secrets.token_hex(32)
+app.config['SECRET_KEY'] = secret_key
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.getenv("SESSION_COOKIE_SECURE", "true" if os.getenv("RENDER") else "false").lower() == "true"
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 db.init_app(app)
 with app.app_context():
     init_db()
+
+MIN_PASSWORD_LENGTH = 6
+VN_TZ = timezone(timedelta(hours=7))  # Vietnam has no DST
+
+def utcnow():
+    """Naive UTC timestamp (matches existing stored values)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+@app.template_filter('vntime')
+def vntime(value, fmt='%Y-%m-%d %H:%M', default='—'):
+    if not value:
+        return default
+    return value.replace(tzinfo=timezone.utc).astimezone(VN_TZ).strftime(fmt)
+
+# CSRF protection
+def csrf_token():
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(32)
+    return session['_csrf_token']
+
+app.jinja_env.globals['csrf_token'] = csrf_token
+
+@app.before_request
+def csrf_protect():
+    if request.method == 'POST':
+        expected = session.get('_csrf_token')
+        sent = request.form.get('csrf_token') or request.headers.get('X-CSRFToken')
+        if not expected or not sent or not hmac.compare_digest(expected, sent):
+            abort(400, description='CSRF token missing or invalid')
+
+@app.before_request
+def enforce_password_change():
+    # Accounts still using the default password must change it before doing anything else
+    if session.get('must_change_password') and request.endpoint not in ('change_password', 'logout', 'static'):
+        flash('Vui lòng đổi mật khẩu mặc định trước khi tiếp tục.', 'warning')
+        return redirect(url_for('change_password'))
+
+# Login throttling (in-memory, per worker)
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
+_failed_logins = defaultdict(list)
+
+def _login_key(username):
+    return f"{request.remote_addr}|{(username or '').lower()}"
+
+def _recent_failures(key):
+    cutoff = time.time() - LOGIN_WINDOW_SECONDS
+    _failed_logins[key] = [t for t in _failed_logins[key] if t > cutoff]
+    return _failed_logins[key]
 
 # Login required decorator
 def login_required(f):
@@ -23,40 +88,33 @@ def login_required(f):
         if not session.get('user_id'):
             flash('Vui lòng đăng nhập để truy cập trang này.', 'warning')
             return redirect(url_for('login'))
+        if not get_current_user():
+            session.clear()
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-# Admin required decorator
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('user_id'):
-            flash('Vui lòng đăng nhập để truy cập trang này.', 'warning')
-            return redirect(url_for('login'))
-        user = User.query.get(session['user_id'])
-        if not user or user.role != 'admin':
-            flash('Bạn không có quyền truy cập trang này.', 'danger')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
+def roles_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not session.get('user_id'):
+                flash('Vui lòng đăng nhập để truy cập trang này.', 'warning')
+                return redirect(url_for('login'))
+            user = get_current_user()
+            if not user or user.role not in roles:
+                flash('Bạn không có quyền truy cập trang này.', 'danger')
+                return redirect(url_for('index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
-# Admin or Storekeeper required decorator
-def admin_or_storekeeper_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('user_id'):
-            flash('Vui lòng đăng nhập để truy cập trang này.', 'warning')
-            return redirect(url_for('login'))
-        user = User.query.get(session['user_id'])
-        if not user or user.role not in ['admin', 'storekeeper']:
-            flash('Bạn không có quyền truy cập trang này.', 'danger')
-            return redirect(url_for('index'))
-        return f(*args, **kwargs)
-    return decorated_function
+admin_required = roles_required('admin')
+admin_or_storekeeper_required = roles_required('admin', 'storekeeper')
 
 def get_current_user():
     if session.get('user_id'):
-        return User.query.get(session['user_id'])
+        return db.session.get(User, session['user_id'])
     return None
 
 def get_user_marathons(user):
@@ -68,7 +126,76 @@ def get_user_marathons(user):
         return Marathon.query.order_by(Marathon.name).all()
     else:
         # Regular users can only see assigned marathons
-        return user.assigned_marathons
+        return sorted(user.assigned_marathons, key=lambda m: m.name)
+
+def can_access_marathon(user, marathon_id):
+    """No marathon (None) is always allowed; otherwise it must be one the user can see."""
+    if not marathon_id:
+        return True
+    try:
+        marathon_id = int(marathon_id)
+    except (TypeError, ValueError):
+        return False
+    return any(m.id == marathon_id for m in get_user_marathons(user))
+
+def parse_quantity(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+def get_or_create(model, name):
+    """Find a row by name (case-insensitive) or create it. Returns None for blank names."""
+    name = (name or '').strip()
+    if not name:
+        return None
+    obj = model.query.filter(func.lower(model.name) == name.lower()).first()
+    if not obj:
+        obj = model(name=name)
+        db.session.add(obj)
+        db.session.flush()
+    return obj
+
+def sum_by(model, marathon_id, *group_cols):
+    """Return {group key: total quantity} for a record model within a marathon."""
+    cols = [getattr(model, c) for c in group_cols]
+    rows = db.session.query(*cols, func.sum(model.quantity)).filter(model.marathon_id == marathon_id).group_by(*cols).all()
+    if len(cols) == 1:
+        return {r[0]: int(r[1] or 0) for r in rows}
+    return {tuple(r[:-1]): int(r[-1] or 0) for r in rows}
+
+def name_maps():
+    return ({e.id: e.name for e in Equipment.query.all()},
+            {s.id: s.name for s in Station.query.all()},
+            {m.id: m.name for m in Marathon.query.all()})
+
+def build_transactions(records, rec_type, eq_names, st_names=None, mar_names=None):
+    rows = []
+    for rec in records:
+        row = {
+            'type': rec_type,
+            'timestamp': rec.timestamp,
+            'equipment': eq_names.get(rec.equipment_id),
+            'quantity': rec.quantity,
+            'person': rec.person_name,
+            'created_by': rec.created_by,
+        }
+        if st_names is not None:
+            row['station'] = st_names.get(rec.station_id)
+        if mar_names is not None:
+            row['marathon'] = mar_names.get(rec.marathon_id, '-----')
+        rows.append(row)
+    return rows
+
+def sort_newest_first(transactions):
+    transactions.sort(key=lambda x: x['timestamp'] or datetime.min, reverse=True)
+    return transactions
+
+def password_too_short(password):
+    if len(password or '') < MIN_PASSWORD_LENGTH:
+        flash(f'Mật khẩu phải có ít nhất {MIN_PASSWORD_LENGTH} ký tự!', 'danger')
+        return True
+    return False
 
 @app.route('/')
 @login_required
@@ -81,18 +208,29 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+        key = _login_key(username)
+        if len(_recent_failures(key)) >= LOGIN_MAX_ATTEMPTS:
+            flash('Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.', 'danger')
+            return render_template('login.html', user=None), 429
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
+            _failed_logins.pop(key, None)
+            session.clear()
+            session.permanent = True
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
+            if password == DEFAULT_ADMIN_PASSWORD:
+                session['must_change_password'] = True
+                return redirect(url_for('change_password'))
             flash(f'Chào mừng {user.username}!', 'success')
             return redirect(url_for('index'))
         else:
+            _failed_logins[key].append(time.time())
             flash('Tên đăng nhập hoặc mật khẩu không đúng!', 'danger')
     return render_template('login.html', user=None)
 
-@app.route('/logout')
+@app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
     flash('Bạn đã đăng xuất thành công!', 'success')
@@ -106,25 +244,39 @@ def change_password():
         current_password = request.form.get('current_password')
         new_password = request.form.get('new_password')
         confirm_password = request.form.get('confirm_password')
-        
+
         if not current_password or not new_password or not confirm_password:
             flash('Vui lòng điền đầy đủ thông tin!', 'danger')
             return render_template('change_password.html', user=user)
-        
+
         if not user.check_password(current_password):
             flash('Mật khẩu hiện tại không đúng!', 'danger')
             return render_template('change_password.html', user=user)
-        
+
         if new_password != confirm_password:
             flash('Mật khẩu mới không khớp!', 'danger')
             return render_template('change_password.html', user=user)
-        
+
+        if password_too_short(new_password):
+            return render_template('change_password.html', user=user)
+
+        if new_password == DEFAULT_ADMIN_PASSWORD:
+            flash('Không được dùng mật khẩu mặc định!', 'danger')
+            return render_template('change_password.html', user=user)
+
         user.set_password(new_password)
         db.session.commit()
+        session.pop('must_change_password', None)
         flash('Mật khẩu đã được thay đổi thành công!', 'success')
         return redirect(url_for('index'))
-    
+
     return render_template('change_password.html', user=user)
+
+def resolve_person_name(user):
+    # Only admin can select/enter a different person, others use their username
+    if user.role == 'admin':
+        return request.form.get('person') or request.form.get('new_person') or user.username
+    return user.username
 
 @app.route('/issue', methods=['GET','POST'])
 @login_required
@@ -136,63 +288,53 @@ def issue():
     persons = Person.query.order_by(Person.name).all()
     if request.method=='POST':
         marathon_id = request.form.get('marathon') or None
-        new_marathon = request.form.get('new_marathon')
-        if new_marathon:
-            m = Marathon(name=new_marathon); db.session.add(m); db.session.commit(); marathon_id = m.id
+        if not can_access_marathon(user, marathon_id):
+            flash('Bạn không có quyền với giải chạy này.', 'danger')
+            return redirect(url_for('issue'))
         station_id = request.form.get('station') or None
-        new_station = request.form.get('new_station')
+        new_station = get_or_create(Station, request.form.get('new_station'))
         if new_station:
-            s = Station(name=new_station); db.session.add(s); db.session.commit(); station_id = s.id
-        
-        # Only admin can select/enter a different person, others use their username
-        if user.role == 'admin':
-            person_name = request.form.get('person') or request.form.get('new_person') or user.username
-        else:
-            person_name = user.username
-        
-        person = Person.query.filter_by(name=person_name).first()
-        if not person:
-            person = Person(name=person_name); db.session.add(person); db.session.commit()
+            station_id = new_station.id
+
+        person = get_or_create(Person, resolve_person_name(user))
         equipment_ids = request.form.getlist('equipment[]')
         quantities = request.form.getlist('quantity[]')
         new_equipments = request.form.getlist('new_equipment[]')
-        
-        # Build final equipment IDs list - use new_equipment[] if it has value, otherwise use equipment[]
-        final_equipment_ids = []
-        for idx in range(len(quantities)):
-            # Check if new_equipment has a value for this row
-            if idx < len(new_equipments) and new_equipments[idx] and not new_equipments[idx].isspace():
-                new_eq_name = new_equipments[idx].strip()
-                # Check if equipment with this name already exists (case-insensitive)
-                existing_eq = Equipment.query.filter(Equipment.name.ilike(new_eq_name)).first()
-                if existing_eq:
-                    # Use existing equipment instead of creating a new one
-                    final_equipment_ids.append(str(existing_eq.id))
-                else:
-                    # Create new equipment and use its ID
-                    eq = Equipment(name=new_eq_name)
-                    db.session.add(eq)
-                    db.session.commit()
-                    final_equipment_ids.append(str(eq.id))
-            elif idx < len(equipment_ids) and equipment_ids[idx]:
-                # Use the selected equipment ID from dropdown
-                final_equipment_ids.append(equipment_ids[idx])
-            else:
-                # No equipment selected for this row
-                final_equipment_ids.append(None)
-        
-        # Save records
-        for eq_id, qty in zip(final_equipment_ids, quantities):
-            try: q=int(qty)
-            except: q=0
-            if q<=0 or not eq_id: continue
-            r = IssueRecord(marathon_id=marathon_id, station_id=station_id, equipment_id=eq_id, 
-                          person_name=person.name, quantity=q, timestamp=datetime.utcnow(),
-                          created_by=user.username)
-            db.session.add(r)
+
+        saved = 0
+        for idx, qty in enumerate(quantities):
+            q = parse_quantity(qty)
+            if q <= 0:
+                continue
+            # Use new_equipment[] if it has a value, otherwise the selected equipment[]
+            new_eq = get_or_create(Equipment, new_equipments[idx] if idx < len(new_equipments) else None)
+            eq_id = new_eq.id if new_eq else (equipment_ids[idx] if idx < len(equipment_ids) else None)
+            if not eq_id:
+                continue
+            db.session.add(IssueRecord(marathon_id=marathon_id, station_id=station_id, equipment_id=eq_id,
+                          person_name=person.name, quantity=q, timestamp=utcnow(),
+                          created_by=user.username))
+            saved += 1
         db.session.commit()
+        flash(f'Đã lưu {saved} dòng giao đồ.' if saved else 'Không có dòng nào được lưu.', 'success' if saved else 'warning')
         return redirect(url_for('issue'))
     return render_template('issue.html', marathons=marathons, stations=stations, equipments=equipments, persons=persons, user=user)
+
+def unreturned_items(marathon_id, station_id=None):
+    """Per (station, equipment): issued minus returned, for rows still outstanding."""
+    issued = sum_by(IssueRecord, marathon_id, 'station_id', 'equipment_id')
+    returned = sum_by(ReturnRecord, marathon_id, 'station_id', 'equipment_id')
+    eq_names, st_names, _ = name_maps()
+    items = []
+    for (st_id, eq_id), qty in issued.items():
+        if station_id and str(st_id) != str(station_id):
+            continue
+        missing = qty - returned.get((st_id, eq_id), 0)
+        if missing > 0:
+            items.append({'station_id': st_id, 'station': st_names.get(st_id, '—'), 'equipment_id': eq_id,
+                          'equipment': eq_names.get(eq_id, '—'), 'missing': missing})
+    items.sort(key=lambda i: (i['station'], i['equipment']))
+    return items
 
 @app.route('/return', methods=['GET','POST'])
 @login_required
@@ -200,58 +342,44 @@ def return_equipment():
     user = get_current_user()
     marathons = get_user_marathons(user)
     stations = Station.query.order_by(Station.name).all()
-    equipments = Equipment.query.order_by(Equipment.name).all()
     persons = Person.query.order_by(Person.name).all()
     marathon_id = request.args.get('marathon') or None
     selected_station_id = request.args.get('station') or None
-    unreturned = []
-    if marathon_id:
-        from sqlalchemy import func
-        issued_q = db.session.query(IssueRecord.station_id, IssueRecord.equipment_id, func.sum(IssueRecord.quantity).label('issued')).filter(IssueRecord.marathon_id==marathon_id).group_by(IssueRecord.station_id, IssueRecord.equipment_id).subquery()
-        returned_q = db.session.query(ReturnRecord.station_id, ReturnRecord.equipment_id, func.sum(ReturnRecord.quantity).label('returned')).filter(ReturnRecord.marathon_id==marathon_id).group_by(ReturnRecord.station_id, ReturnRecord.equipment_id).subquery()
-        base_query = db.session.query(issued_q.c.station_id, issued_q.c.equipment_id, issued_q.c.issued, returned_q.c.returned).outerjoin(returned_q, (issued_q.c.station_id==returned_q.c.station_id)&(issued_q.c.equipment_id==returned_q.c.equipment_id))
-        if selected_station_id:
-            base_query = base_query.filter(issued_q.c.station_id == selected_station_id)
-        rows = base_query.all()
-        for r in rows:
-            returned = r.returned or 0
-            if r.issued - returned > 0:
-                st = Station.query.get(r.station_id) if r.station_id else None
-                eq = Equipment.query.get(r.equipment_id)
-                unreturned.append({'station_id': r.station_id, 'station': st.name if st else '—', 'equipment_id': r.equipment_id, 'equipment': eq.name if eq else '—', 'missing': int(r.issued-returned)})
+    if not can_access_marathon(user, marathon_id):
+        flash('Bạn không có quyền với giải chạy này.', 'danger')
+        return redirect(url_for('return_equipment'))
     if request.method=='POST':
         marathon_id = request.form.get('marathon') or None
-        new_marathon = request.form.get('new_marathon')
-        if new_marathon:
-            m = Marathon(name=new_marathon); db.session.add(m); db.session.commit(); marathon_id = m.id
-        station_id = request.form.get('station') or None
-        new_station = request.form.get('new_station')
-        if new_station:
-            s = Station(name=new_station); db.session.add(s); db.session.commit(); station_id = s.id
-        
-        # Only admin can select/enter a different person, others use their username
-        if user.role == 'admin':
-            person_name = request.form.get('person') or request.form.get('new_person') or user.username
-        else:
-            person_name = user.username
-        
-        person = Person.query.filter_by(name=person_name).first()
-        if not person:
-            person = Person(name=person_name); db.session.add(person); db.session.commit()
+        if not marathon_id or not can_access_marathon(user, marathon_id):
+            flash('Bạn không có quyền với giải chạy này.', 'danger')
+            return redirect(url_for('return_equipment'))
+        person = get_or_create(Person, resolve_person_name(user))
+        outstanding = {(i['station_id'], i['equipment_id']): i['missing'] for i in unreturned_items(marathon_id)}
+        station_ids = request.form.getlist('station_id[]')
         equipment_ids = request.form.getlist('equipment[]')
         quantities = request.form.getlist('quantity[]')
-        for eq_id, qty in zip(equipment_ids, quantities):
-            try: q=int(qty)
-            except: q=0
-            if q<=0 or not eq_id: continue
-            r = ReturnRecord(marathon_id=marathon_id, station_id=station_id, equipment_id=eq_id, 
-                           person_name=person.name, quantity=q, timestamp=datetime.utcnow(),
-                           created_by=user.username)
-            db.session.add(r)
+        saved = 0
+        for st_id, eq_id, qty in zip(station_ids, equipment_ids, quantities):
+            q = parse_quantity(qty)
+            if q <= 0:
+                continue
+            st_key = int(st_id) if st_id.isdigit() else None
+            eq_key = parse_quantity(eq_id)
+            missing = outstanding.get((st_key, eq_key), 0)
+            if q > missing:
+                flash(f'Số lượng trả vượt quá số còn thiếu ({missing}); đã bỏ qua dòng này.', 'warning')
+                continue
+            db.session.add(ReturnRecord(marathon_id=marathon_id, station_id=st_key, equipment_id=eq_key,
+                           person_name=person.name, quantity=q, timestamp=utcnow(),
+                           created_by=user.username))
+            saved += 1
         db.session.commit()
+        if saved:
+            flash(f'Đã lưu {saved} dòng trả đồ.', 'success')
         return redirect(url_for('return_equipment', marathon=marathon_id))
-    return render_template('return.html', marathons=marathons, stations=stations, equipments=equipments, 
-                         persons=persons, unreturned=unreturned, selected_marathon=marathon_id, 
+    unreturned = unreturned_items(marathon_id, selected_station_id) if marathon_id else []
+    return render_template('return.html', marathons=marathons, stations=stations,
+                         persons=persons, unreturned=unreturned, selected_marathon=marathon_id,
                          selected_station=selected_station_id, user=user)
 
 @app.route('/report', methods=['GET'])
@@ -259,64 +387,32 @@ def return_equipment():
 def report():
     user = get_current_user()
     marathon_id = request.args.get('marathon') or None
-    marathons = Marathon.query.order_by(Marathon.name).all()
+    marathons = get_user_marathons(user)
+    if not can_access_marathon(user, marathon_id):
+        flash('Bạn không có quyền với giải chạy này.', 'danger')
+        return redirect(url_for('report'))
     equipment_summary = []; station_details = []; transactions = []
-    from sqlalchemy import func
-    equipments = Equipment.query.order_by(Equipment.name).all()
-    stations = Station.query.order_by(Station.name).all()
     if marathon_id:
-        for eq in equipments:
-            issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
-            returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
-            diff = issued - returned
-            # Only include equipment with activity (issued or returned > 0)
-            if issued > 0 or returned > 0:
-                equipment_summary.append({
-                    'equipment': eq.name,
-                    'issued': int(issued), 
-                    'returned': int(returned), 
-                    'remaining': int(diff)
-                })
-        for st in stations:
-            items = []
-            for eq in equipments:
-                issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id, IssueRecord.station_id==st.id).scalar() or 0
-                returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id, ReturnRecord.station_id==st.id).scalar() or 0
-                diff = issued - returned
-                if diff>0: items.append({'equipment': eq.name, 'missing': int(diff)})
-            if items: station_details.append({'station': st.name, 'items': items})
-        # Get transaction history (only issue and return records)
-        issue_records = IssueRecord.query.filter_by(marathon_id=marathon_id).all()
-        return_records = ReturnRecord.query.filter_by(marathon_id=marathon_id).all()
-        
-        for rec in issue_records:
-            station = Station.query.get(rec.station_id) if rec.station_id else None
-            equipment = Equipment.query.get(rec.equipment_id)
-            transactions.append({
-                'type': 'issue',
-                'timestamp': rec.timestamp,
-                'station': station.name if station else None,
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
+        eq_names, st_names, _ = name_maps()
+        issued_by_eq = sum_by(IssueRecord, marathon_id, 'equipment_id')
+        returned_by_eq = sum_by(ReturnRecord, marathon_id, 'equipment_id')
+        for eq_id in sorted(set(issued_by_eq) | set(returned_by_eq), key=lambda i: eq_names.get(i, '')):
+            issued = issued_by_eq.get(eq_id, 0)
+            returned = returned_by_eq.get(eq_id, 0)
+            equipment_summary.append({
+                'equipment': eq_names.get(eq_id, '—'),
+                'issued': issued,
+                'returned': returned,
+                'remaining': issued - returned
             })
-        
-        for rec in return_records:
-            station = Station.query.get(rec.station_id) if rec.station_id else None
-            equipment = Equipment.query.get(rec.equipment_id)
-            transactions.append({
-                'type': 'return',
-                'timestamp': rec.timestamp,
-                'station': station.name if station else None,
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
-        
-        # Sort transactions by timestamp descending (newest first)
-        transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
+        by_station = {}
+        for item in unreturned_items(marathon_id):
+            by_station.setdefault(item['station'], []).append({'equipment': item['equipment'], 'missing': item['missing']})
+        station_details = [{'station': st, 'items': items} for st, items in sorted(by_station.items())]
+
+        transactions = build_transactions(IssueRecord.query.filter_by(marathon_id=marathon_id).all(), 'issue', eq_names, st_names) + \
+                       build_transactions(ReturnRecord.query.filter_by(marathon_id=marathon_id).all(), 'return', eq_names, st_names)
+        sort_newest_first(transactions)
     return render_template('report.html', marathons=marathons, equipment_summary=equipment_summary, station_details=station_details, selected_marathon=marathon_id, transactions=transactions, user=user)
 
 @app.route('/reconciliation_report', methods=['GET'])
@@ -325,103 +421,49 @@ def reconciliation_report():
     user = get_current_user()
     marathon_id = request.args.get('marathon') or None
     marathons = Marathon.query.order_by(Marathon.name).all()
-    equipment_summary = []; store_transactions = []
-    from sqlalchemy import func
-    equipments = Equipment.query.order_by(Equipment.name).all()
-    
+    equipment_summary = []
+    eq_names, _, mar_names = name_maps()
+
     if marathon_id:
         # Show statistics and records for selected marathon
-        for eq in equipments:
-            store_issued = db.session.query(func.sum(StoreIssueRecord.quantity)).filter(StoreIssueRecord.equipment_id==eq.id, StoreIssueRecord.marathon_id==marathon_id).scalar() or 0
-            issued = db.session.query(func.sum(IssueRecord.quantity)).filter(IssueRecord.equipment_id==eq.id, IssueRecord.marathon_id==marathon_id).scalar() or 0
-            returned = db.session.query(func.sum(ReturnRecord.quantity)).filter(ReturnRecord.equipment_id==eq.id, ReturnRecord.marathon_id==marathon_id).scalar() or 0
-            store_returned = db.session.query(func.sum(StoreReturnRecord.quantity)).filter(StoreReturnRecord.equipment_id==eq.id, StoreReturnRecord.marathon_id==marathon_id).scalar() or 0
-            
-            # Calculate differences
-            store_vs_issued = store_issued - issued  # Should be 0 if balanced
-            returned_vs_store = returned - store_returned  # Should be 0 if balanced
-            
+        store_issued = sum_by(StoreIssueRecord, marathon_id, 'equipment_id')
+        issued = sum_by(IssueRecord, marathon_id, 'equipment_id')
+        returned = sum_by(ReturnRecord, marathon_id, 'equipment_id')
+        store_returned = sum_by(StoreReturnRecord, marathon_id, 'equipment_id')
+        for eq in Equipment.query.order_by(Equipment.name).all():
+            si, i, r, sr = (d.get(eq.id, 0) for d in (store_issued, issued, returned, store_returned))
             equipment_summary.append({
                 'equipment': eq.name,
-                'store_issued': int(store_issued),
-                'issued': int(issued), 
-                'store_vs_issued_diff': int(store_vs_issued),
-                'returned': int(returned), 
-                'store_returned': int(store_returned),
-                'returned_vs_store_diff': int(returned_vs_store)
+                'store_issued': si,
+                'issued': i,
+                'store_vs_issued_diff': si - i,  # Should be 0 if balanced
+                'returned': r,
+                'store_returned': sr,
+                'returned_vs_store_diff': r - sr  # Should be 0 if balanced
             })
-        
-        # Get store transaction history for selected marathon
-        store_issue_records = StoreIssueRecord.query.filter_by(marathon_id=marathon_id).order_by(StoreIssueRecord.timestamp.desc()).all()
-        store_return_records = StoreReturnRecord.query.filter_by(marathon_id=marathon_id).order_by(StoreReturnRecord.timestamp.desc()).all()
-        
-        for rec in store_issue_records:
-            equipment = Equipment.query.get(rec.equipment_id)
-            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
-            store_transactions.append({
-                'type': 'store_issue',
-                'timestamp': rec.timestamp,
-                'marathon': marathon.name if marathon else '-----',
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
-        
-        for rec in store_return_records:
-            equipment = Equipment.query.get(rec.equipment_id)
-            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
-            store_transactions.append({
-                'type': 'store_return',
-                'timestamp': rec.timestamp,
-                'marathon': marathon.name if marathon else '-----',
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
-        
-        # Sort transactions by timestamp descending (newest first)
-        store_transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
+        store_issue_q = StoreIssueRecord.query.filter_by(marathon_id=marathon_id)
+        store_return_q = StoreReturnRecord.query.filter_by(marathon_id=marathon_id)
     else:
         # Show 100 most recent store issue/return records when no marathon is selected
-        store_issue_records = StoreIssueRecord.query.order_by(StoreIssueRecord.timestamp.desc()).limit(100).all()
-        store_return_records = StoreReturnRecord.query.order_by(StoreReturnRecord.timestamp.desc()).limit(100).all()
-        
-        for rec in store_issue_records:
-            equipment = Equipment.query.get(rec.equipment_id)
-            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
-            store_transactions.append({
-                'type': 'store_issue',
-                'timestamp': rec.timestamp,
-                'marathon': marathon.name if marathon else '-----',
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
-        
-        for rec in store_return_records:
-            equipment = Equipment.query.get(rec.equipment_id)
-            marathon = Marathon.query.get(rec.marathon_id) if rec.marathon_id else None
-            store_transactions.append({
-                'type': 'store_return',
-                'timestamp': rec.timestamp,
-                'marathon': marathon.name if marathon else '-----',
-                'equipment': equipment.name if equipment else None,
-                'quantity': rec.quantity,
-                'person': rec.person_name,
-                'created_by': rec.created_by
-            })
-        
-        # Sort transactions by timestamp descending (newest first)
-        store_transactions.sort(key=lambda x: x['timestamp'] if x['timestamp'] else datetime.min, reverse=True)
-    
-    return render_template('reconciliation_report.html', marathons=marathons, equipment_summary=equipment_summary, 
+        store_issue_q = StoreIssueRecord.query.order_by(StoreIssueRecord.timestamp.desc()).limit(100)
+        store_return_q = StoreReturnRecord.query.order_by(StoreReturnRecord.timestamp.desc()).limit(100)
+
+    store_transactions = build_transactions(store_issue_q.all(), 'store_issue', eq_names, mar_names=mar_names) + \
+                         build_transactions(store_return_q.all(), 'store_return', eq_names, mar_names=mar_names)
+    sort_newest_first(store_transactions)
+
+    return render_template('reconciliation_report.html', marathons=marathons, equipment_summary=equipment_summary,
                          selected_marathon=marathon_id, store_transactions=store_transactions, user=user)
 
+def store_person_name():
+    person = get_or_create(Person, request.form.get('person') or request.form.get('new_person'))
+    if not person:
+        flash('Vui lòng chọn hoặc nhập tên người!', 'danger')
+        return None
+    return person.name
+
 @app.route('/store_issue', methods=['GET','POST'])
-@login_required
+@admin_or_storekeeper_required
 def store_issue():
     user = get_current_user()
     marathons = Marathon.query.order_by(Marathon.name).all()
@@ -429,129 +471,96 @@ def store_issue():
     persons = Person.query.order_by(Person.name).all()
     if request.method=='POST':
         marathon_id = request.form.get('marathon') or None
-        new_marathon = request.form.get('new_marathon')
+        new_marathon = get_or_create(Marathon, request.form.get('new_marathon'))
         if new_marathon:
-            m = Marathon(name=new_marathon)
-            db.session.add(m)
-            db.session.commit()
-            marathon_id = m.id
-        
-        person_name = request.form.get('person') or request.form.get('new_person')
-        if person_name:
-            person = Person.query.filter_by(name=person_name).first()
-            if not person:
-                person = Person(name=person_name)
-                db.session.add(person)
-                db.session.commit()
-        
+            marathon_id = new_marathon.id
+        person_name = store_person_name()
+        if not person_name:
+            return redirect(url_for('store_issue'))
+
         equipment_ids = request.form.getlist('equipment[]')
         quantities = request.form.getlist('quantity[]')
-        
+
         for eq_id, qty in zip(equipment_ids, quantities):
-            try: q=int(qty)
-            except: q=0
+            q = parse_quantity(qty)
             if q<=0 or not eq_id: continue
-            r = StoreIssueRecord(marathon_id=marathon_id, equipment_id=eq_id, 
-                          person_name=person_name, quantity=q, timestamp=datetime.utcnow(),
-                          created_by=user.username)
-            db.session.add(r)
+            db.session.add(StoreIssueRecord(marathon_id=marathon_id, equipment_id=eq_id,
+                          person_name=person_name, quantity=q, timestamp=utcnow(),
+                          created_by=user.username))
         db.session.commit()
         flash('Xuất kho thành công!', 'success')
         return redirect(url_for('store_issue'))
     return render_template('store_issue.html', marathons=marathons, equipments=equipments, persons=persons, user=user)
 
+def store_available(marathon_id):
+    """Per equipment: store_issued - store_returned (independent of user issue/return)."""
+    store_issued = sum_by(StoreIssueRecord, marathon_id, 'equipment_id')
+    store_returned = sum_by(StoreReturnRecord, marathon_id, 'equipment_id')
+    return {eq_id: qty - store_returned.get(eq_id, 0) for eq_id, qty in store_issued.items() if qty - store_returned.get(eq_id, 0) > 0}
+
 @app.route('/store_return', methods=['GET','POST'])
-@login_required
+@admin_or_storekeeper_required
 def store_return():
     user = get_current_user()
     marathons = Marathon.query.order_by(Marathon.name).all()
     equipments = Equipment.query.order_by(Equipment.name).all()
     persons = Person.query.order_by(Person.name).all()
     marathon_id = request.args.get('marathon') or None
-    unreturned = []
-    if marathon_id:
-        from sqlalchemy import func
-        # Calculate: store_issued - store_returned (independent of user issue/return)
-        store_issued_q = db.session.query(StoreIssueRecord.equipment_id, func.sum(StoreIssueRecord.quantity).label('store_issued')).filter(StoreIssueRecord.marathon_id==marathon_id).group_by(StoreIssueRecord.equipment_id).subquery()
-        store_returned_q = db.session.query(StoreReturnRecord.equipment_id, func.sum(StoreReturnRecord.quantity).label('store_returned')).filter(StoreReturnRecord.marathon_id==marathon_id).group_by(StoreReturnRecord.equipment_id).subquery()
-        
-        base_query = db.session.query(
-            store_issued_q.c.equipment_id,
-            store_issued_q.c.store_issued,
-            store_returned_q.c.store_returned
-        ).outerjoin(store_returned_q, store_issued_q.c.equipment_id==store_returned_q.c.equipment_id)
-        
-        rows = base_query.all()
-        for r in rows:
-            store_issued = r.store_issued or 0
-            store_returned = r.store_returned or 0
-            # Available to return to store = store_issued - already returned to store
-            available = store_issued - store_returned
-            if available > 0:
-                eq = Equipment.query.get(r.equipment_id)
-                unreturned.append({'equipment_id': r.equipment_id, 'equipment': eq.name if eq else '—', 'available': int(available)})
-    
+
     if request.method=='POST':
-        # Get marathon_id from form data (for non-race returns) or from query string (for race-specific returns)
-        form_marathon_id = request.form.get('marathon')
-        if form_marathon_id:
-            marathon_id = form_marathon_id
-        else:
-            marathon_id = None
-        
-        person_name = request.form.get('person') or request.form.get('new_person')
-        if person_name:
-            person = Person.query.filter_by(name=person_name).first()
-            if not person:
-                person = Person(name=person_name)
-                db.session.add(person)
-                db.session.commit()
-        
+        # marathon from form data; empty means a non-race return
+        marathon_id = request.form.get('marathon') or None
+        redirect_url = url_for('store_return', marathon=marathon_id) if marathon_id else url_for('store_return')
+        person_name = store_person_name()
+        if not person_name:
+            return redirect(redirect_url)
+        available = store_available(marathon_id) if marathon_id else None
+
         equipment_ids = request.form.getlist('equipment[]')
         quantities = request.form.getlist('quantity[]')
-        
+
         for eq_id, qty in zip(equipment_ids, quantities):
-            try: q=int(qty)
-            except: q=0
+            q = parse_quantity(qty)
             if q<=0 or not eq_id: continue
-            r = StoreReturnRecord(marathon_id=marathon_id, equipment_id=eq_id, 
-                           person_name=person_name, quantity=q, timestamp=datetime.utcnow(),
-                           created_by=user.username)
-            db.session.add(r)
+            if available is not None and q > available.get(parse_quantity(eq_id), 0):
+                flash(f'Số lượng nhập kho vượt quá số có thể nhập ({available.get(parse_quantity(eq_id), 0)}); đã bỏ qua dòng này.', 'warning')
+                continue
+            db.session.add(StoreReturnRecord(marathon_id=marathon_id, equipment_id=eq_id,
+                           person_name=person_name, quantity=q, timestamp=utcnow(),
+                           created_by=user.username))
         db.session.commit()
         flash('Nhập kho thành công!', 'success')
-        # Redirect back to the same page with or without marathon parameter
-        if marathon_id:
-            return redirect(url_for('store_return', marathon=marathon_id))
-        else:
-            return redirect(url_for('store_return'))
-    
+        return redirect(redirect_url)
+
+    unreturned = []
+    if marathon_id:
+        eq_names, _, _ = name_maps()
+        unreturned = sorted(({'equipment_id': eq_id, 'equipment': eq_names.get(eq_id, '—'), 'available': qty}
+                             for eq_id, qty in store_available(marathon_id).items()), key=lambda i: i['equipment'])
     return render_template('store_return.html', marathons=marathons, equipments=equipments, persons=persons,
                          unreturned=unreturned, selected_marathon=marathon_id, user=user)
+
+def api_get_or_create(model):
+    name = ((request.get_json(silent=True) or {}).get('name') or '').strip()
+    if not name: return jsonify({'error':'missing name'}),400
+    obj = get_or_create(model, name)
+    db.session.commit()
+    return jsonify({'id':obj.id,'name':obj.name})
 
 @app.route('/api/add_station', methods=['POST'])
 @login_required
 def api_add_station():
-    name = request.json.get('name')
-    if not name: return jsonify({'error':'missing name'}),400
-    s = Station(name=name); db.session.add(s); db.session.commit()
-    return jsonify({'id':s.id,'name':s.name})
+    return api_get_or_create(Station)
 
 @app.route('/api/add_equipment', methods=['POST'])
 @login_required
 def api_add_equipment():
-    name = request.json.get('name')
-    if not name: return jsonify({'error':'missing name'}),400
-    e = Equipment(name=name); db.session.add(e); db.session.commit()
-    return jsonify({'id':e.id,'name':e.name})
+    return api_get_or_create(Equipment)
 
 @app.route('/api/add_marathon', methods=['POST'])
-@login_required
+@admin_or_storekeeper_required
 def api_add_marathon():
-    name = request.json.get('name')
-    if not name: return jsonify({'error':'missing name'}),400
-    m = Marathon(name=name); db.session.add(m); db.session.commit()
-    return jsonify({'id':m.id,'name':m.name})
+    return api_get_or_create(Marathon)
 
 @app.route('/api/persons')
 @login_required
@@ -571,57 +580,67 @@ def admin_users():
 def admin_add_user():
     user = get_current_user()
     if request.method == 'POST':
-        username = request.form.get('username')
+        username = (request.form.get('username') or '').strip()
         password = request.form.get('password')
         role = request.form.get('role', 'user')
-        
+
         if not username or not password:
             flash('Tên đăng nhập và mật khẩu là bắt buộc!', 'danger')
             return render_template('admin_add_user.html', user=user)
-        
+
+        if role not in ['admin', 'user', 'storekeeper']:
+            flash('Vai trò không hợp lệ!', 'danger')
+            return render_template('admin_add_user.html', user=user)
+
+        if password_too_short(password):
+            return render_template('admin_add_user.html', user=user)
+
         existing_user = User.query.filter_by(username=username).first()
         if existing_user:
             flash('Tên đăng nhập đã tồn tại!', 'danger')
             return render_template('admin_add_user.html', user=user)
-        
+
         new_user = User(username=username, role=role)
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
         flash(f'Người dùng {username} đã được tạo thành công!', 'success')
         return redirect(url_for('admin_users'))
-    
+
     return render_template('admin_add_user.html', user=user)
 
 @app.route('/admin/users/<int:user_id>/reset_password', methods=['GET', 'POST'])
 @admin_required
 def admin_reset_password(user_id):
     current_user = get_current_user()
-    target_user = User.query.get_or_404(user_id)
-    
+    target_user = db.get_or_404(User, user_id)
+
     if request.method == 'POST':
         new_password = request.form.get('password')
         if not new_password:
             flash('Mật khẩu không được để trống!', 'danger')
             return render_template('admin_reset_password.html', target_user=target_user, user=current_user)
-        
+
+        if password_too_short(new_password):
+            return render_template('admin_reset_password.html', target_user=target_user, user=current_user)
+
         target_user.set_password(new_password)
         db.session.commit()
         flash(f'Mật khẩu của {target_user.username} đã được đặt lại thành công!', 'success')
         return redirect(url_for('admin_users'))
-    
+
     return render_template('admin_reset_password.html', target_user=target_user, user=current_user)
 
 @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_user(user_id):
     current_user = get_current_user()
-    target_user = User.query.get_or_404(user_id)
-    
+    target_user = db.get_or_404(User, user_id)
+
     if target_user.id == current_user.id:
         flash('Bạn không thể xóa tài khoản của chính mình!', 'danger')
         return redirect(url_for('admin_users'))
-    
+
     username = target_user.username
     db.session.delete(target_user)
     db.session.commit()
@@ -642,7 +661,7 @@ def admin_dashboard():
 @app.route('/admin/delete/issue/<int:record_id>', methods=['POST'])
 @admin_required
 def delete_issue_record(record_id):
-    record = IssueRecord.query.get_or_404(record_id)
+    record = db.get_or_404(IssueRecord, record_id)
     db.session.delete(record)
     db.session.commit()
     flash('Bản ghi xuất đã được xóa thành công!', 'success')
@@ -651,157 +670,144 @@ def delete_issue_record(record_id):
 @app.route('/admin/delete/return/<int:record_id>', methods=['POST'])
 @admin_required
 def delete_return_record(record_id):
-    record = ReturnRecord.query.get_or_404(record_id)
+    record = db.get_or_404(ReturnRecord, record_id)
     db.session.delete(record)
     db.session.commit()
     flash('Bản ghi nhập đã được xóa thành công!', 'success')
     return redirect(url_for('admin_dashboard'))
 
-@app.route('/admin/edit/issue/<int:record_id>', methods=['GET', 'POST'])
-@admin_required
-def edit_issue_record(record_id):
+def edit_record(model, record_id, template, success_message):
     user = get_current_user()
-    record = IssueRecord.query.get_or_404(record_id)
+    record = db.get_or_404(model, record_id)
     marathons = Marathon.query.order_by(Marathon.name).all()
     stations = Station.query.order_by(Station.name).all()
     equipments = Equipment.query.order_by(Equipment.name).all()
     if request.method == 'POST':
-        record.marathon_id = request.form.get('marathon') or None
-        record.station_id = request.form.get('station') or None
-        record.equipment_id = request.form.get('equipment')
-        record.quantity = int(request.form.get('quantity'))
-        record.person_name = request.form.get('person')
-        db.session.commit()
-        flash('Bản ghi xuất đã được cập nhật thành công!', 'success')
-        return redirect(url_for('admin_dashboard'))
-    return render_template('admin_edit_issue.html', record=record, marathons=marathons, stations=stations, equipments=equipments, user=user)
+        quantity = parse_quantity(request.form.get('quantity'))
+        equipment_id = request.form.get('equipment')
+        if quantity <= 0 or not equipment_id:
+            flash('Số lượng phải là số nguyên dương và phải chọn thiết bị!', 'danger')
+        else:
+            record.marathon_id = request.form.get('marathon') or None
+            record.station_id = request.form.get('station') or None
+            record.equipment_id = equipment_id
+            record.quantity = quantity
+            record.person_name = request.form.get('person')
+            db.session.commit()
+            flash(success_message, 'success')
+            return redirect(url_for('admin_dashboard'))
+    return render_template(template, record=record, marathons=marathons, stations=stations, equipments=equipments, user=user)
+
+@app.route('/admin/edit/issue/<int:record_id>', methods=['GET', 'POST'])
+@admin_required
+def edit_issue_record(record_id):
+    return edit_record(IssueRecord, record_id, 'admin_edit_issue.html', 'Bản ghi xuất đã được cập nhật thành công!')
 
 @app.route('/admin/edit/return/<int:record_id>', methods=['GET', 'POST'])
 @admin_required
 def edit_return_record(record_id):
-    user = get_current_user()
-    record = ReturnRecord.query.get_or_404(record_id)
-    marathons = Marathon.query.order_by(Marathon.name).all()
-    stations = Station.query.order_by(Station.name).all()
-    equipments = Equipment.query.order_by(Equipment.name).all()
-    if request.method == 'POST':
-        record.marathon_id = request.form.get('marathon') or None
-        record.station_id = request.form.get('station') or None
-        record.equipment_id = request.form.get('equipment')
-        record.quantity = int(request.form.get('quantity'))
-        record.person_name = request.form.get('person')
+    return edit_record(ReturnRecord, record_id, 'admin_edit_return.html', 'Bản ghi nhập đã được cập nhật thành công!')
+
+def is_referenced(column_name, value, models):
+    return any(m.query.filter(getattr(m, column_name) == value).first() for m in models)
+
+def rename(obj, anchor, success_message):
+    name = (request.form.get('name') or '').strip()
+    if name:
+        clash = type(obj).query.filter(func.lower(type(obj).name) == name.lower(), type(obj).id != obj.id).first()
+        if clash:
+            flash(f'Tên "{name}" đã tồn tại!', 'danger')
+        else:
+            obj.name = name
+            db.session.commit()
+            flash(success_message, 'success')
+    return redirect(url_for('admin_dashboard') + anchor)
+
+def add_named(model, anchor, success_message):
+    name = (request.form.get('name') or '').strip()
+    if name:
+        if model.query.filter(func.lower(model.name) == name.lower()).first():
+            flash(f'Tên "{name}" đã tồn tại!', 'danger')
+        else:
+            db.session.add(model(name=name))
+            db.session.commit()
+            flash(success_message.format(name=name), 'success')
+    return redirect(url_for('admin_dashboard') + anchor)
+
+def delete_named(obj, column_name, models, anchor, success_message):
+    name = obj.name
+    if is_referenced(column_name, obj.id, models):
+        flash(f'Không thể xóa "{name}" vì đã có bản ghi liên quan. Hãy xóa các bản ghi đó trước.', 'danger')
+    else:
+        db.session.delete(obj)
         db.session.commit()
-        flash('Bản ghi nhập đã được cập nhật thành công!', 'success')
-        return redirect(url_for('admin_dashboard'))
-    return render_template('admin_edit_return.html', record=record, marathons=marathons, stations=stations, equipments=equipments, user=user)
+        flash(success_message.format(name=name), 'success')
+    return redirect(url_for('admin_dashboard') + anchor)
+
+ALL_RECORD_MODELS = (IssueRecord, ReturnRecord, StoreIssueRecord, StoreReturnRecord)
 
 # Marathon management routes
 @app.route('/admin/marathon/add', methods=['POST'])
 @admin_required
 def admin_add_marathon():
-    name = request.form.get('name')
-    if name:
-        marathon = Marathon(name=name)
-        db.session.add(marathon)
-        db.session.commit()
-        flash(f'Giải chạy "{name}" đã được thêm!', 'success')
-    return redirect(url_for('admin_dashboard') + '#marathons')
+    return add_named(Marathon, '#marathons', 'Giải chạy "{name}" đã được thêm!')
 
 @app.route('/admin/marathon/<int:marathon_id>/edit', methods=['POST'])
 @admin_required
 def admin_edit_marathon(marathon_id):
-    marathon = Marathon.query.get_or_404(marathon_id)
-    name = request.form.get('name')
-    if name:
-        marathon.name = name
-        db.session.commit()
-        flash(f'Giải chạy đã được cập nhật!', 'success')
-    return redirect(url_for('admin_dashboard') + '#marathons')
+    return rename(db.get_or_404(Marathon, marathon_id), '#marathons', 'Giải chạy đã được cập nhật!')
 
 @app.route('/admin/marathon/<int:marathon_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_marathon(marathon_id):
-    marathon = Marathon.query.get_or_404(marathon_id)
-    name = marathon.name
-    db.session.delete(marathon)
-    db.session.commit()
-    flash(f'Giải chạy "{name}" đã được xóa!', 'success')
-    return redirect(url_for('admin_dashboard') + '#marathons')
+    return delete_named(db.get_or_404(Marathon, marathon_id), 'marathon_id', ALL_RECORD_MODELS,
+                        '#marathons', 'Giải chạy "{name}" đã được xóa!')
 
 # Station management routes
 @app.route('/admin/station/add', methods=['POST'])
 @admin_required
 def admin_add_station_form():
-    name = request.form.get('name')
-    if name:
-        station = Station(name=name)
-        db.session.add(station)
-        db.session.commit()
-        flash(f'Trạm "{name}" đã được thêm!', 'success')
-    return redirect(url_for('admin_dashboard') + '#stations')
+    return add_named(Station, '#stations', 'Trạm "{name}" đã được thêm!')
 
 @app.route('/admin/station/<int:station_id>/edit', methods=['POST'])
 @admin_required
 def admin_edit_station(station_id):
-    station = Station.query.get_or_404(station_id)
-    name = request.form.get('name')
-    if name:
-        station.name = name
-        db.session.commit()
-        flash(f'Trạm đã được cập nhật!', 'success')
-    return redirect(url_for('admin_dashboard') + '#stations')
+    return rename(db.get_or_404(Station, station_id), '#stations', 'Trạm đã được cập nhật!')
 
 @app.route('/admin/station/<int:station_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_station(station_id):
-    station = Station.query.get_or_404(station_id)
-    name = station.name
-    db.session.delete(station)
-    db.session.commit()
-    flash(f'Trạm "{name}" đã được xóa!', 'success')
-    return redirect(url_for('admin_dashboard') + '#stations')
+    return delete_named(db.get_or_404(Station, station_id), 'station_id', (IssueRecord, ReturnRecord),
+                        '#stations', 'Trạm "{name}" đã được xóa!')
 
 # Equipment management routes
 @app.route('/admin/equipment/add', methods=['POST'])
 @admin_required
 def admin_add_equipment_form():
-    name = request.form.get('name')
-    if name:
-        equipment = Equipment(name=name)
-        db.session.add(equipment)
-        db.session.commit()
-        flash(f'Thiết bị "{name}" đã được thêm!', 'success')
-    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+    return add_named(Equipment, '#equipments-manage', 'Thiết bị "{name}" đã được thêm!')
 
 @app.route('/admin/equipment/<int:equipment_id>/edit', methods=['POST'])
 @admin_required
 def admin_edit_equipment(equipment_id):
-    equipment = Equipment.query.get_or_404(equipment_id)
-    name = request.form.get('name')
-    if name:
-        equipment.name = name
-        db.session.commit()
-        flash(f'Thiết bị đã được cập nhật!', 'success')
-    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+    return rename(db.get_or_404(Equipment, equipment_id), '#equipments-manage', 'Thiết bị đã được cập nhật!')
 
 @app.route('/admin/equipment/<int:equipment_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_equipment(equipment_id):
-    equipment = Equipment.query.get_or_404(equipment_id)
-    name = equipment.name
-    db.session.delete(equipment)
-    db.session.commit()
-    flash(f'Thiết bị "{name}" đã được xóa!', 'success')
-    return redirect(url_for('admin_dashboard') + '#equipments-manage')
+    return delete_named(db.get_or_404(Equipment, equipment_id), 'equipment_id', ALL_RECORD_MODELS,
+                        '#equipments-manage', 'Thiết bị "{name}" đã được xóa!')
 
 @app.route('/admin/equipment/<int:equipment_id>/set_available', methods=['POST'])
 @admin_required
 def admin_set_available_quantity(equipment_id):
-    equipment = Equipment.query.get_or_404(equipment_id)
+    equipment = db.get_or_404(Equipment, equipment_id)
     available_quantity = request.form.get('available_quantity')
     if available_quantity is not None:
         try:
-            equipment.available_quantity = int(available_quantity)
+            value = int(available_quantity)
+            if value < 0:
+                raise ValueError
+            equipment.available_quantity = value
             db.session.commit()
             flash(f'Đã cập nhật tồn kho cho "{equipment.name}"!', 'success')
         except ValueError:
@@ -814,7 +820,7 @@ def admin_set_available_quantity(equipment_id):
 def manage_inventory():
     user = get_current_user()
     equipments = Equipment.query.order_by(Equipment.name).all()
-    
+
     if request.method == 'POST':
         # Get all equipment IDs and quantities from form
         for equipment in equipments:
@@ -822,14 +828,16 @@ def manage_inventory():
             qty_value = request.form.get(qty_key)
             if qty_value is not None:
                 try:
-                    equipment.available_quantity = int(qty_value)
+                    value = int(qty_value)
                 except ValueError:
-                    pass  # Skip invalid values
-        
+                    continue  # Skip invalid values
+                if value >= 0:
+                    equipment.available_quantity = value
+
         db.session.commit()
         flash('Đã cập nhật tồn kho thành công!', 'success')
         return redirect(url_for('manage_inventory'))
-    
+
     return render_template('manage_inventory.html', equipments=equipments, user=user)
 
 # User-Marathon assignment routes
@@ -837,39 +845,29 @@ def manage_inventory():
 @admin_required
 def admin_user_marathons(user_id):
     current_user = get_current_user()
-    target_user = User.query.get_or_404(user_id)
+    target_user = db.get_or_404(User, user_id)
     all_marathons = Marathon.query.order_by(Marathon.name).all()
-    
+
     if request.method == 'POST':
         # Get selected marathon IDs from form
-        selected_marathon_ids = request.form.getlist('marathons')
-        selected_marathon_ids = [int(mid) for mid in selected_marathon_ids if mid]
-        
-        # Clear existing assignments
-        target_user.assigned_marathons = []
-        
-        # Add new assignments
-        for marathon_id in selected_marathon_ids:
-            marathon = Marathon.query.get(marathon_id)
-            if marathon:
-                target_user.assigned_marathons.append(marathon)
-        
+        selected_marathon_ids = [parse_quantity(mid) for mid in request.form.getlist('marathons') if mid]
+        target_user.assigned_marathons = Marathon.query.filter(Marathon.id.in_(selected_marathon_ids)).all() if selected_marathon_ids else []
         db.session.commit()
         flash(f'Đã cập nhật phân công giải chạy cho {target_user.username}!', 'success')
         return redirect(url_for('admin_users'))
-    
+
     return render_template('admin_user_marathons.html', target_user=target_user, all_marathons=all_marathons, user=current_user)
 
 @app.route('/admin/users/<int:user_id>/change_role', methods=['GET', 'POST'])
 @admin_required
 def admin_change_user_role(user_id):
     current_user = get_current_user()
-    target_user = User.query.get_or_404(user_id)
-    
+    target_user = db.get_or_404(User, user_id)
+
     if target_user.id == current_user.id:
         flash('Bạn không thể thay đổi vai trò của chính mình!', 'danger')
         return redirect(url_for('admin_users'))
-    
+
     if request.method == 'POST':
         new_role = request.form.get('role')
         if new_role in ['admin', 'user', 'storekeeper']:
@@ -879,7 +877,7 @@ def admin_change_user_role(user_id):
             return redirect(url_for('admin_users'))
         else:
             flash('Vai trò không hợp lệ!', 'danger')
-    
+
     return render_template('admin_change_role.html', target_user=target_user, user=current_user)
 
 @app.route('/admin/marathon_users', methods=['GET', 'POST'])
@@ -888,34 +886,27 @@ def admin_marathon_users():
     current_user = get_current_user()
     marathons = Marathon.query.order_by(Marathon.name).all()
     all_users = User.query.filter(User.role == 'user').order_by(User.username).all()
-    
+
     selected_marathon_id = request.args.get('marathon') or (marathons[0].id if marathons else None)
-    selected_marathon = Marathon.query.get(selected_marathon_id) if selected_marathon_id else None
-    
+    selected_marathon = db.session.get(Marathon, parse_quantity(selected_marathon_id)) if selected_marathon_id else None
+
     if request.method == 'POST':
         marathon_id = request.form.get('marathon_id')
-        selected_marathon = Marathon.query.get_or_404(marathon_id)
-        
+        selected_marathon = db.get_or_404(Marathon, parse_quantity(marathon_id))
+
         # Get selected user IDs from form
-        selected_user_ids = request.form.getlist('users')
-        selected_user_ids = [int(uid) for uid in selected_user_ids if uid]
-        
-        # Clear existing assignments for this marathon
-        for user in selected_marathon.assigned_users:
-            if user.role != 'admin':  # Don't modify admin assignments
-                selected_marathon.assigned_users.remove(user)
-        
-        # Add new assignments
-        for user_id in selected_user_ids:
-            user = User.query.get(user_id)
-            if user and user.role != 'admin' and user not in selected_marathon.assigned_users:
-                selected_marathon.assigned_users.append(user)
-        
+        selected_user_ids = {parse_quantity(uid) for uid in request.form.getlist('users') if uid}
+
+        # Keep non-'user' roles (admins etc.) as they are; replace regular user assignments
+        kept = [u for u in selected_marathon.assigned_users if u.role != 'user']
+        chosen = User.query.filter(User.id.in_(selected_user_ids), User.role == 'user').all() if selected_user_ids else []
+        selected_marathon.assigned_users = kept + chosen
+
         db.session.commit()
         flash(f'Đã cập nhật phân công người dùng cho giải chạy "{selected_marathon.name}"!', 'success')
         return redirect(url_for('admin_marathon_users', marathon=marathon_id))
-    
-    return render_template('admin_marathon_users.html', marathons=marathons, all_users=all_users, 
+
+    return render_template('admin_marathon_users.html', marathons=marathons, all_users=all_users,
                          selected_marathon=selected_marathon, user=current_user)
 
-if __name__=='__main__': app.run(debug=True)
+if __name__=='__main__': app.run(debug=os.getenv("FLASK_DEBUG") == "1")

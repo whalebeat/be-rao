@@ -4,7 +4,7 @@
   <h3>Thay Đổi Vai Trò - {{ target_user.username }}</h3>
   <p class="text-muted">Chọn vai trò mới cho người dùng này</p>
   
-  <form method="post">
+  <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="mb-3">
       <label class="form-label fw-bold">Vai trò hiện tại:</label>
       <p>

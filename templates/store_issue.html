@@ -16,7 +16,7 @@
       {% endif %}
     </div>
   </div>
-  <form method="post" id="store-issue-form">
+  <form method="post" id="store-issue-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
         <label class="form-label">Giải chạy <span class="text-muted">(Tùy chọn)</span></label>
@@ -112,23 +112,5 @@ document.addEventListener('change', function(e) {
   }
 });
 
-// Add marathon functionality
-document.getElementById('save-marathon').addEventListener('click', function() {
-  const name = document.getElementById('new-marathon-name').value.trim();
-  if (!name) return alert('Vui lòng nhập tên Giải chạy!');
-  fetch('/api/add_marathon', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name: name})
-  }).then(r => r.json()).then(data => {
-    const opt = document.createElement('option');
-    opt.value = data.id;
-    opt.textContent = data.name;
-    opt.selected = true;
-    document.getElementById('marathon-select').appendChild(opt);
-    document.getElementById('new-marathon-name').value = '';
-    bootstrap.Modal.getInstance(document.getElementById('addMarathonModal')).hide();
-  }).catch(err => alert('Lỗi khi thêm Giải chạy!'));
-});
 </script>
 {% endblock %}

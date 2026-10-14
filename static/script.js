@@ -1,3 +1,19 @@
+// Attach the CSRF token to same-origin fetch POSTs
+const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+async function postJson(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfMeta ? csrfMeta.content : ''},
+        body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+        let msg = 'Lỗi ' + res.status;
+        try { msg = (await res.json()).error || msg; } catch (e) {}
+        throw new Error(msg);
+    }
+    return res.json();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     function initTable(tableId, addBtnId) {
         const table = document.getElementById(tableId);
@@ -35,12 +51,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveMarathon) saveMarathon.onclick = async () => {
         const name = document.getElementById('new-marathon-name').value.trim();
         if (!name) return alert('Enter marathon name');
-        const res = await fetch('/api/add_marathon', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name})
-        });
-        const data = await res.json();
+        let data;
+        try { data = await postJson('/api/add_marathon', {name}); }
+        catch (err) { return alert(err.message); }
         document.querySelectorAll('#marathon-select,#marathon-select-return,select[name="marathon"]').forEach(s => {
             const opt = document.createElement('option');
             opt.value = data.id;
@@ -60,12 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveStation) saveStation.onclick = async () => {
         const name = document.getElementById('new-station-name').value.trim();
         if (!name) return alert('Enter station name');
-        const res = await fetch('/api/add_station', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name})
-        });
-        const data = await res.json();
+        let data;
+        try { data = await postJson('/api/add_station', {name}); }
+        catch (err) { return alert(err.message); }
         document.querySelectorAll('#station-select,#station-select-return').forEach(s => {
             const opt = document.createElement('option');
             opt.value = data.id;
@@ -81,12 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveEquipment) saveEquipment.onclick = async () => {
         const name = document.getElementById('new-equipment-name').value.trim();
         if (!name) return alert('Enter equipment name');
-        const res = await fetch('/api/add_equipment', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name})
-        });
-        const data = await res.json();
+        let data;
+        try { data = await postJson('/api/add_equipment', {name}); }
+        catch (err) { return alert(err.message); }
         document.querySelectorAll('select[name="equipment[]"]').forEach(s => {
             const opt = document.createElement('option');
             opt.value = data.id;
@@ -142,31 +149,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const newPersonInput = returnForm.querySelector('input[name="new_person"]');
             if (personSelect && personSelect.value) {
                 newPersonInput.value = ''; // Clear new person if one was selected
-            }
-            
-            // If no station is selected but there's one unreturned item selected to return,
-            // use that item's station instead
-            const stationSelect = document.getElementById('station-select-return');
-            if (stationSelect && !stationSelect.value) {
-                const quantities = returnForm.querySelectorAll('input[name="quantity[]"]');
-                const stationCells = returnForm.querySelectorAll('#return-table tbody tr td:first-child');
-                let selectedStation = null;
-                
-                for (let i = 0; i < quantities.length; i++) {
-                    if (quantities[i].value > 0) {
-                        const stationName = stationCells[i].textContent.trim();
-                        if (stationName && stationName !== '—') {
-                            // Find matching station ID from select options
-                            for (const opt of stationSelect.options) {
-                                if (opt.textContent === stationName) {
-                                    stationSelect.value = opt.value;
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
             }
             
             return true; // Allow form submission to continue

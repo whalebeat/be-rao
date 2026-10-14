@@ -97,7 +97,7 @@
                 <span class="badge bg-secondary">Nhập kho</span>
               {% endif %}
             </td>
-            <td>{{ t.timestamp.strftime('%Y-%m-%d %H:%M') if t.timestamp else '—' }}</td>
+            <td>{{ t.timestamp|vntime('%Y-%m-%d %H:%M', '—') }}</td>
             <td>{{ t.equipment or '—' }}</td>
             <td>{{ t.quantity }}</td>
             <td>{{ t.person or '—' }}</td>
@@ -135,7 +135,7 @@
                 <span class="badge bg-secondary">Nhập kho</span>
               {% endif %}
             </td>
-            <td>{{ t.timestamp.strftime('%Y-%m-%d %H:%M') if t.timestamp else '—' }}</td>
+            <td>{{ t.timestamp|vntime('%Y-%m-%d %H:%M', '—') }}</td>
             <td>{{ t.equipment or '—' }}</td>
             <td>{{ t.quantity }}</td>
             <td>{{ t.person or '—' }}</td>

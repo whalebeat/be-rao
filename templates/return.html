@@ -9,7 +9,7 @@
     </a>
     {% endif %}
   </div>
-  <form method="post" id="return-form">
+  <form method="post" id="return-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="row g-2 mb-3">
       <div class="col-md-4">
         <label class="form-label">Giải chạy</label>
@@ -55,7 +55,7 @@
         <tbody>
           {% for it in unreturned %}
           <tr>
-            <td>{{ it.station }}</td>
+            <td>{{ it.station }}<input type="hidden" name="station_id[]" value="{{ it.station_id or '' }}"></td>
             <td>{{ it.equipment }}<input type="hidden" name="equipment[]" value="{{ it.equipment_id }}"></td>
             <td>{{ it.missing }}</td>
             <td><input name="quantity[]" type="number" min="0" max="{{ it.missing }}" value="0" class="form-control"></td>

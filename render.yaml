@@ -10,6 +10,10 @@ services:
         fromDatabase:
           name: be-rao-db
           property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
 
 databases:
   - name: be-rao-db
