@@ -1,0 +1,61 @@
+{% macro price(product) -%}
+  {%- if product.has_no_price -%}
+    <span class="sw-contact-price">Liên hệ</span>
+  {%- elif product.on_sale and product.regular_price -%}
+    <del class="text-muted small me-1">{{ product.regular_price|vnd }}</del><span class="sw-price">{{ product.sale_price|vnd }}</span>
+  {%- else -%}
+    <span class="sw-price">{{ product.price|vnd }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro product_card(product) -%}
+  {% set img = product.images[0] if product.images else None %}
+  <div class="card sw-card h-100">
+    <a href="{{ url_for('public.product', slug=product.slug) }}" class="sw-card-img">
+      {% if img %}<img src="{{ image_src(img) }}" alt="{{ product.name }}" loading="lazy">{% else %}<span class="sw-noimg">☀</span>{% endif %}
+    </a>
+    <div class="card-body d-flex flex-column">
+      {% if product.brands %}<div class="small text-muted mb-1">{{ product.brands|map(attribute='name')|join(', ') }}</div>{% endif %}
+      <h3 class="h6 card-title"><a href="{{ url_for('public.product', slug=product.slug) }}" class="stretched-link text-reset text-decoration-none">{{ product.name }}</a></h3>
+      <div class="mt-auto">{{ price(product) }}</div>
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro pagination(page) -%}
+  {% if page.pages > 1 %}
+  <nav aria-label="Phân trang" class="mt-4">
+    <ul class="pagination justify-content-center flex-wrap">
+      {% set args = request.args.to_dict() %}
+      {% if page.has_prev %}<li class="page-item"><a class="page-link" href="{{ url_for(request.endpoint, **dict(request.view_args, **dict(args, trang=page.prev_num))) }}">‹</a></li>{% endif %}
+      {% for n in page.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if n %}
+          <li class="page-item {% if n == page.page %}active{% endif %}"><a class="page-link" href="{{ url_for(request.endpoint, **dict(request.view_args, **dict(args, trang=n))) }}">{{ n }}</a></li>
+        {% else %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+      {% endfor %}
+      {% if page.has_next %}<li class="page-item"><a class="page-link" href="{{ url_for(request.endpoint, **dict(request.view_args, **dict(args, trang=page.next_num))) }}">›</a></li>{% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+{%- endmacro %}
+
+{% macro turnstile() -%}
+  {% set key = turnstile_site_key() %}
+  {% if key %}
+    <div class="cf-turnstile my-3" data-sitekey="{{ key }}" data-language="vi"></div>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
+{%- endmacro %}
+
+{% macro post_card(post, endpoint) -%}
+  <div class="card sw-card h-100">
+    <a href="{{ url_for(endpoint, slug=post.slug) }}" class="sw-card-img sw-card-img-wide">
+      {% if post.thumbnail %}<img src="{{ media_url(post.thumbnail) }}" alt="{{ post.title }}" loading="lazy">{% else %}<span class="sw-noimg">☀</span>{% endif %}
+    </a>
+    <div class="card-body">
+      <div class="small text-muted mb-1">{{ post.created_at|vntime('%d/%m/%Y') }}</div>
+      <h3 class="h6 card-title"><a href="{{ url_for(endpoint, slug=post.slug) }}" class="stretched-link text-reset text-decoration-none">{{ post.title }}</a></h3>
+      {% if post.excerpt %}<p class="small text-muted mb-0">{{ post.excerpt|truncate(140) }}</p>{% endif %}
+    </div>
+  </div>
+{%- endmacro %}

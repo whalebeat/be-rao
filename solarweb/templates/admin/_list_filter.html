@@ -1,0 +1,9 @@
+{# Shared status/search filter for orders, leads and messages. Needs `statuses`, `status`, `search`. #}
+<form method="get" class="adm-card p-2 mb-3 d-flex flex-wrap gap-2">
+  <input name="q" value="{{ search }}" class="form-control form-control-sm" style="max-width:260px" placeholder="Tìm tên, SĐT{% if request.endpoint == 'admin.orders' %}, mã đơn{% endif %}" aria-label="Tìm">
+  <select name="trang_thai" class="form-select form-select-sm" style="max-width:200px" aria-label="Trạng thái">
+    <option value="">Mọi trạng thái</option>
+    {% for key, label in statuses.items() %}<option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm btn-secondary">Lọc</button>
+</form>

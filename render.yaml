@@ -4,7 +4,8 @@ services:
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    # be-rao at /, SolarWeb at /solar (see wsgi.py)
+    startCommand: "gunicorn wsgi:app"
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -13,6 +14,27 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ADMIN_PASSWORD
+        sync: false
+      # SolarWeb: reads SOLARWEB_<NAME> first, then <NAME> (DATABASE_URL is shared, tables are prefixed sw_)
+      - key: SOLARWEB_SECRET_KEY
+        generateValue: true
+      - key: SOLARWEB_ADMIN_PASSWORD
+        sync: false
+      - key: SOLARWEB_SITE_URL
+        value: "https://teso.vn/solar"
+      - key: SOLARWEB_NOINDEX
+        value: "1"
+      - key: SOLARWEB_ADMIN_EMAIL
+        sync: false
+      - key: SOLARWEB_SMTP_HOST
+        sync: false
+      - key: SOLARWEB_SMTP_USER
+        sync: false
+      - key: SOLARWEB_SMTP_PASSWORD
+        sync: false
+      - key: SOLARWEB_TURNSTILE_SITE_KEY
+        sync: false
+      - key: SOLARWEB_TURNSTILE_SECRET
         sync: false
 
 databases:

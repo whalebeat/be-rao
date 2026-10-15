@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% block title %}Đơn {{ order.code }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin.orders') }}" class="small">← Danh sách đơn hàng</a>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-3">
+  <h1 class="h4 mb-0">Đơn {{ order.code }} <span class="text-muted fs-6">{{ order.created_at|vntime }}</span></h1>
+  {% with statuses = ORDER_STATUSES, current = order.status %}{% include "admin/_status_form.html" %}{% endwith %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="adm-card p-3">
+      <h2 class="h6">Khách hàng</h2>
+      <table class="table table-sm mb-0">
+        <tr><th style="width:110px">Họ tên</th><td>{{ order.name }}</td></tr>
+        <tr><th>SĐT</th><td><a href="tel:{{ order.phone }}">{{ order.phone }}</a> · <a href="https://zalo.me/{{ order.phone.lstrip('+') }}" target="_blank" rel="noopener">Zalo</a></td></tr>
+        <tr><th>Địa chỉ</th><td>{{ order.address }}, {{ order.city }}</td></tr>
+        <tr><th>Email</th><td>{% if order.email %}<a href="mailto:{{ order.email }}">{{ order.email }}</a>{% else %}—{% endif %}</td></tr>
+        <tr><th>Ghi chú</th><td style="white-space:pre-line">{{ order.note or '—' }}</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="adm-card p-3 table-responsive">
+      <h2 class="h6">Sản phẩm</h2>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Sản phẩm</th><th>SKU</th><th class="text-end">Đơn giá</th><th class="text-end">SL</th><th class="text-end">Thành tiền</th></tr></thead>
+        <tbody>
+          {% for item in order.items %}
+          <tr>
+            <td>{% if item.product_id %}<a href="{{ url_for('admin.product_edit', product_id=item.product_id) }}">{{ item.name }}</a>{% else %}{{ item.name }}{% endif %}</td>
+            <td class="small">{{ item.sku }}</td>
+            <td class="text-end">{% if item.unit_price is none %}<span class="text-danger">Liên hệ</span>{% else %}{{ item.unit_price|vnd }}{% endif %}</td>
+            <td class="text-end">{{ item.qty }}</td>
+            <td class="text-end">{% if item.subtotal is none %}<span class="text-danger">Liên hệ</span>{% else %}{{ item.subtotal|vnd }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><th colspan="4" class="text-end">Tạm tính</th><th class="text-end">{{ order.total_known|vnd }}</th></tr></tfoot>
+      </table>
+      {% if order.has_contact_price %}<p class="small text-danger mt-2 mb-0">Có sản phẩm giá "Liên hệ" – cần báo giá cho khách.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

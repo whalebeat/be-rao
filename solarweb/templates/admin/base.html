@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Quản trị{% endblock %} – {{ site_name }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% set ep = request.endpoint or '' %}
+<div class="d-lg-flex">
+  {% if user %}
+  <nav class="adm-sidebar p-2 flex-shrink-0">
+    <a href="{{ url_for('admin.dashboard') }}" class="adm-brand">☀ {{ site_name }}</a>
+    <a href="{{ url_for('admin.dashboard') }}" class="{% if ep == 'admin.dashboard' %}active{% endif %}">Tổng quan</a>
+    <div class="adm-group">Bán hàng</div>
+    <a href="{{ url_for('admin.orders') }}" class="{% if ep.startswith('admin.order') %}active{% endif %}">Đơn hàng {% if new_orders %}<span class="badge text-bg-danger">{{ new_orders }}</span>{% endif %}</a>
+    <a href="{{ url_for('admin.leads') }}" class="{% if ep.startswith('admin.lead') %}active{% endif %}">Yêu cầu tư vấn {% if new_leads %}<span class="badge text-bg-danger">{{ new_leads }}</span>{% endif %}</a>
+    <a href="{{ url_for('admin.messages') }}" class="{% if ep.startswith('admin.message') %}active{% endif %}">Tin nhắn liên hệ</a>
+    <div class="adm-group">Sản phẩm</div>
+    <a href="{{ url_for('admin.products') }}" class="{% if ep in ('admin.products', 'admin.product_edit', 'admin.product_new') %}active{% endif %}">Tất cả sản phẩm</a>
+    <a href="{{ url_for('admin.categories') }}" class="{% if ep.startswith('admin.categor') %}active{% endif %}">Danh mục</a>
+    <a href="{{ url_for('admin.brands') }}" class="{% if ep.startswith('admin.brand') %}active{% endif %}">Thương hiệu</a>
+    <a href="{{ url_for('admin.product_import') }}" class="{% if ep == 'admin.product_import' %}active{% endif %}">Nhập / Xuất CSV</a>
+    <div class="adm-group">Nội dung</div>
+    {% for kind, label in POST_KINDS.items() %}
+      <a href="{{ url_for('admin.posts', kind=kind) }}" class="{% if ep.startswith('admin.post') and request.view_args.get('kind') == kind %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+    {% if user.role == 'admin' %}
+    <div class="adm-group">Hệ thống</div>
+    <a href="{{ url_for('admin.settings') }}" class="{% if ep == 'admin.settings' %}active{% endif %}">Cài đặt chung</a>
+    <a href="{{ url_for('admin.calc_settings_view') }}" class="{% if ep == 'admin.calc_settings_view' %}active{% endif %}">Tính điện mặt trời</a>
+    <a href="{{ url_for('admin.users') }}" class="{% if ep.startswith('admin.user') %}active{% endif %}">Người dùng</a>
+    {% endif %}
+    <div class="adm-group">{{ user.username }} · {{ ROLES.get(user.role, user.role) }}</div>
+    <a href="{{ url_for('public.home') }}" target="_blank">Xem website ↗</a>
+    <a href="{{ url_for('admin.change_password') }}" class="{% if ep == 'admin.change_password' %}active{% endif %}">Đổi mật khẩu</a>
+    <form method="post" action="{{ url_for('admin.logout') }}" class="px-2 mt-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline-light w-100">Đăng xuất</button>
+    </form>
+  </nav>
+  {% endif %}
+  <main class="adm-main flex-grow-1 p-3 p-lg-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">{{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button></div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script>window.ADMIN_UPLOAD_URL = {{ url_for('admin.media_upload')|tojson }};</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='admin.js') }}"></script>
+</body>
+</html>

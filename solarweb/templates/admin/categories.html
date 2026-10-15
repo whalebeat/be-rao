@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block title %}Danh mục{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Danh mục sản phẩm</h1>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="adm-card p-3">
+      <h2 class="h6">Thêm danh mục</h2>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2"><label class="form-label small" for="cname">Tên</label><input id="cname" name="name" class="form-control" required maxlength="200"></div>
+        <div class="mb-2"><label class="form-label small" for="cparent">Danh mục cha</label>
+          <select id="cparent" name="parent_id" class="form-select"><option value="">— Không có (danh mục gốc) —</option>
+            {% for c, depth in categories %}<option value="{{ c.id }}">{{ '— ' * depth }}{{ c.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-3"><label class="form-label small" for="cpos">Thứ tự hiển thị</label><input id="cpos" name="position" type="number" value="0" class="form-control"></div>
+        <button type="submit" class="btn btn-primary">Thêm</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="adm-card table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Tên</th><th>Slug</th><th class="text-end">Sản phẩm</th><th></th></tr></thead>
+        <tbody>
+          {% for c, depth in categories %}
+          <tr>
+            <td style="padding-left:{{ 0.5 + depth * 1.5 }}rem">{{ c.name }}</td>
+            <td class="small text-muted">{{ c.slug }}</td>
+            <td class="text-end">{{ counts.get(c.id, 0) }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{{ url_for('admin.category_edit', category_id=c.id) }}" class="btn btn-sm btn-outline-secondary">Sửa</a>
+              <form method="post" action="{{ url_for('admin.category_delete', category_id=c.id) }}" class="d-inline" data-confirm="Xóa danh mục này? Sản phẩm vẫn được giữ, danh mục con sẽ chuyển lên một cấp.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="4" class="text-muted p-3">Chưa có danh mục.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import price, product_card %}
+{% block title %}{{ product.seo_title or product.name }}{% endblock %}
+{% block meta_description %}{{ product.seo_description or product.short_description or product.name }}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block og_image %}{% if product.images %}{{ image_src(product.images[0], external=True) }}{% endif %}{% endblock %}
+{% block head %}<script type="application/ld+json">{{ jsonld|tojson }}</script>{% endblock %}
+{% block content %}
+{% set datasheet = media_url(product.datasheet_media) if product.datasheet_media else product.datasheet_url %}
+<div class="container">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('public.home') }}">Trang chủ</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('public.products') }}">Sản phẩm</a></li>
+      {% if product.categories %}<li class="breadcrumb-item"><a href="{{ url_for('public.category', slug=product.categories[0].slug) }}">{{ product.categories[0].name }}</a></li>{% endif %}
+      <li class="breadcrumb-item active" aria-current="page">{{ product.name }}</li>
+    </ol>
+  </nav>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="sw-gallery">
+        {% if product.images %}
+          <img id="sw-main-img" src="{{ image_src(product.images[0]) }}" alt="{{ product.name }}" class="sw-gallery-main">
+          {% if product.images|length > 1 %}
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            {% for img in product.images %}
+              <button type="button" class="sw-thumb" data-src="{{ image_src(img) }}" aria-label="Ảnh {{ loop.index }}"><img src="{{ image_src(img) }}" alt="" loading="lazy"></button>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% else %}<div class="sw-gallery-main sw-noimg d-flex align-items-center justify-content-center">☀</div>{% endif %}
+      </div>
+    </div>
+    <div class="col-md-6">
+      <h1 class="h3">{{ product.name }}</h1>
+      <p class="small text-muted mb-2">Mã: {{ product.sku }}
+        {% if product.brands %} · <span class="sw-brand">Thương hiệu:
+          {% for b in product.brands %}<a href="{{ url_for('public.brand', slug=b.slug) }}">{{ b.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+      </p>
+      <div class="fs-4 mb-3">{{ price(product) }}</div>
+      {% if product.short_description %}<p>{{ product.short_description }}</p>{% endif %}
+      <p class="small">{% if product.in_stock %}<span class="text-success">● Còn hàng</span>{% else %}<span class="text-danger">● Tạm hết hàng – liên hệ để đặt trước</span>{% endif %}</p>
+      <form method="post" action="{{ url_for('cart.add') }}" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <label for="qty" class="visually-hidden">Số lượng</label>
+        <input id="qty" type="number" name="qty" value="1" min="1" max="9999" class="form-control" style="width:6rem">
+        <button type="submit" class="btn btn-sw">{% if product.has_no_price %}Thêm vào yêu cầu báo giá{% else %}Thêm vào giỏ hàng{% endif %}</button>
+      </form>
+      <div class="d-flex flex-wrap gap-2">
+        {% if datasheet %}<a class="btn btn-outline-dark" href="{{ datasheet }}" target="_blank" rel="noopener">📄 Tải datasheet (PDF)</a>{% endif %}
+        {% if zalo %}<a class="btn btn-outline-primary" href="https://zalo.me/{{ digits_only(zalo) }}" target="_blank" rel="noopener">Tư vấn qua Zalo</a>{% endif %}
+        {% if hotline %}<a class="btn btn-outline-danger" href="tel:{{ digits_only(hotline) }}">Gọi {{ hotline }}</a>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mt-5" role="tablist">
+    {% if specs %}<li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-specs" type="button" role="tab">Thông số kỹ thuật</button></li>{% endif %}
+    <li class="nav-item" role="presentation"><button class="nav-link {% if not specs %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-desc" type="button" role="tab">Mô tả</button></li>
+  </ul>
+  <div class="tab-content border border-top-0 p-3 mb-5">
+    {% if specs %}
+    <div class="tab-pane fade show active" id="tab-specs" role="tabpanel">
+      <h2 class="h5">Thông số kỹ thuật</h2>
+      <table class="table table-striped table-sm mb-0 sw-specs">
+        <tbody>{% for a in specs %}<tr><th scope="row">{{ a.name }}</th><td>{{ a.value }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% endif %}
+    <div class="tab-pane fade {% if not specs %}show active{% endif %}" id="tab-desc" role="tabpanel">
+      <div class="sw-content">{{ product.description|safe if product.description else '<p class="text-muted">Đang cập nhật.</p>'|safe }}</div>
+    </div>
+  </div>
+
+  {% if related %}
+  <section class="mb-4">
+    <h2 class="sw-section-title">Sản phẩm liên quan</h2>
+    <div class="row g-3">{% for p in related %}<div class="col-6 col-md-3">{{ product_card(p) }}</div>{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.sw-thumb').forEach(function (btn) {
+  btn.addEventListener('click', function () { document.getElementById('sw-main-img').src = btn.dataset.src; });
+});
+</script>
+{% endblock %}

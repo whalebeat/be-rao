@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% from "partials/macros.html" import pagination %}
+{% block title %}Yêu cầu tư vấn{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Yêu cầu tư vấn <span class="text-muted fs-6">({{ page.total }})</span></h1>
+{% with statuses = LEAD_STATUSES %}{% include "admin/_list_filter.html" %}{% endwith %}
+<div class="adm-card table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Khách hàng</th><th>SĐT</th><th>Tỉnh/thành</th><th>Hóa đơn/tháng</th><th>Hệ thống</th><th>Giá ước tính</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
+    <tbody>
+      {% for l in page.items %}
+      <tr>
+        <td><a href="{{ url_for('admin.lead_detail', lead_id=l.id) }}">{{ l.name }}</a></td>
+        <td>{{ l.phone }}</td><td>{{ l.province }}</td><td>{{ l.bill }}</td>
+        <td class="small">{{ l.system }}</td><td class="small">{{ l.price }}</td>
+        <td><span class="badge text-bg-{{ 'danger' if l.status == 'moi' else 'secondary' }}">{{ LEAD_STATUSES.get(l.status) }}</span></td>
+        <td class="small text-muted text-nowrap">{{ l.created_at|vntime }}</td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="text-muted p-3">Chưa có yêu cầu tư vấn.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ pagination(page) }}
+{% endblock %}

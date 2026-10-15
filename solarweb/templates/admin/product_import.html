@@ -1,0 +1,46 @@
+{% extends "admin/base.html" %}
+{% block title %}Nhập / Xuất CSV{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Nhập / Xuất sản phẩm (CSV)</h1>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="adm-card p-3">
+      <h2 class="h6">Nhập từ CSV</h2>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" name="file" accept=".csv,text/csv" class="form-control mb-2" required>
+        <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="update_existing" value="1" id="upd" checked><label class="form-check-label" for="upd">Cập nhật sản phẩm có sẵn (theo SKU)</label></div>
+        <button type="submit" class="btn btn-primary">Nhập</button>
+      </form>
+      {% if report %}
+      <hr>
+      <p class="mb-2"><strong>Kết quả:</strong> tạo mới {{ report.created }} · cập nhật {{ report.updated }} · bỏ qua {{ report.skipped }}</p>
+      {% if report.errors %}
+      <ul class="small text-danger mb-0">{% for line, message in report.errors %}<li>Dòng {{ line }}: {{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="adm-card p-3 mb-3">
+      <h2 class="h6">Xuất ra CSV</h2>
+      <p class="small">Tải về toàn bộ sản phẩm, sửa bằng Excel rồi nhập lại để cập nhật hàng loạt.</p>
+      <a href="{{ url_for('admin.product_export') }}" class="btn btn-outline-secondary">Tải tệp CSV</a>
+    </div>
+    <div class="adm-card p-3 small">
+      <h2 class="h6">Định dạng cột</h2>
+      <p>Giống tệp xuất của WooCommerce (mẫu: <code>seed/products.csv</code>):</p>
+      <ul class="mb-2">
+        <li><b>SKU</b>, <b>Name</b> – bắt buộc. SKU dùng để nhận diện khi cập nhật.</li>
+        <li><b>Regular price</b> – để trống = hiển thị "Liên hệ".</li>
+        <li><b>Categories</b> – dạng <code>Inverter &gt; Inverter 1 pha</code>, nhiều danh mục cách nhau bởi dấu phẩy.</li>
+        <li><b>Brands</b> (hoặc <b>Thương hiệu</b>) – cách nhau bởi dấu phẩy.</li>
+        <li><b>Attribute 1 name</b> / <b>Attribute 1 value(s)</b>… – bảng thông số kỹ thuật.</li>
+        <li><b>Images</b> – đường dẫn ảnh (https://…), cách nhau bởi dấu phẩy.</li>
+        <li><b>Meta: _solarweb_datasheet</b> – đường dẫn PDF datasheet.</li>
+      </ul>
+      <p class="mb-0">Khi lưu từ Excel, chọn <b>CSV UTF-8 (Comma delimited)</b> để giữ dấu tiếng Việt.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

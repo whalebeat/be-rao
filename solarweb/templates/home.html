@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import product_card, post_card %}
+{% block meta_description %}{{ site_name }} – thiết bị điện mặt trời chính hãng: inverter, tấm pin, pin lưu trữ, phụ kiện. Tư vấn, thiết kế và thi công trọn gói.{% endblock %}
+{% block content %}
+<section class="sw-hero mb-5">
+  <div class="container py-5">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <h1 class="display-6 fw-bold">Giải pháp điện mặt trời cho gia đình &amp; doanh nghiệp</h1>
+        <p class="lead">Inverter, tấm pin, pin lưu trữ chính hãng. Khảo sát, thiết kế, thi công và bảo trì trọn gói.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{{ url_for('public.products') }}" class="btn btn-sw btn-lg">Xem sản phẩm</a>
+          <a href="{{ url_for('public.calculator') }}" class="btn btn-outline-light btn-lg">Tính điện mặt trời</a>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="sw-hero-card p-4">
+          <h2 class="h5">Hóa đơn điện bao nhiêu thì nên lắp?</h2>
+          <p class="mb-3">Nhập tiền điện hàng tháng để biết công suất, chi phí và thời gian hoàn vốn ước tính.</p>
+          <a href="{{ url_for('public.calculator') }}" class="btn btn-light">Tính ngay →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+  {% if categories %}
+  <section class="mb-5">
+    <h2 class="sw-section-title">Danh mục sản phẩm</h2>
+    <div class="row g-3">
+      {% for c in categories %}
+      <div class="col-6 col-md-4 col-lg-3">
+        <a href="{{ url_for('public.category', slug=c.slug) }}" class="sw-tile d-block h-100 p-3 text-decoration-none">
+          <span class="fw-semibold">{{ c.name }}</span>
+          {% if c.children %}<span class="d-block small text-muted">{{ c.children|map(attribute='name')|join(', ') }}</span>{% endif %}
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if featured %}
+  <section class="mb-5">
+    <div class="d-flex justify-content-between align-items-baseline">
+      <h2 class="sw-section-title">Sản phẩm nổi bật</h2>
+      <a href="{{ url_for('public.products') }}">Xem tất cả →</a>
+    </div>
+    <div class="row g-3">
+      {% for p in featured %}<div class="col-6 col-md-4 col-lg-3">{{ product_card(p) }}</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if brands %}
+  <section class="mb-5">
+    <h2 class="sw-section-title">Thương hiệu</h2>
+    <div class="d-flex flex-wrap gap-2">
+      {% for b in brands %}<a href="{{ url_for('public.brand', slug=b.slug) }}" class="btn btn-outline-secondary">{{ b.name }}</a>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if projects %}
+  <section class="mb-5">
+    <div class="d-flex justify-content-between align-items-baseline">
+      <h2 class="sw-section-title">Dự án đã thực hiện</h2>
+      <a href="{{ url_for('public.projects') }}">Xem tất cả →</a>
+    </div>
+    <div class="row g-3">
+      {% for post in projects %}<div class="col-md-4">{{ post_card(post, 'public.project') }}</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if news %}
+  <section class="mb-5">
+    <div class="d-flex justify-content-between align-items-baseline">
+      <h2 class="sw-section-title">Tin tức</h2>
+      <a href="{{ url_for('public.news_list') }}">Xem tất cả →</a>
+    </div>
+    <div class="row g-3">
+      {% for post in news %}<div class="col-md-4">{{ post_card(post, 'public.news') }}</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="sw-cta p-4 p-md-5 mb-3 text-center">
+    <h2 class="h4">Cần tư vấn hệ thống điện mặt trời?</h2>
+    <p class="mb-3">Kỹ thuật viên sẽ gọi lại để khảo sát mái và gửi báo giá chính xác.</p>
+    <a href="{{ url_for('public.contact') }}" class="btn btn-sw">Liên hệ tư vấn</a>
+    {% if hotline %}<a href="tel:{{ digits_only(hotline) }}" class="btn btn-outline-dark ms-2">Gọi {{ hotline }}</a>{% endif %}
+  </section>
+</div>
+{% endblock %}

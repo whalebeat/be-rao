@@ -1,0 +1,20 @@
+{% extends "admin/base.html" %}
+{% block title %}Sửa danh mục{% endblock %}
+{% block content %}
+<div class="adm-card p-3" style="max-width:520px">
+  <h1 class="h5 mb-3">Sửa danh mục</h1>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-2"><label class="form-label small" for="name">Tên</label><input id="name" name="name" class="form-control" required maxlength="200" value="{{ category.name }}"></div>
+    <div class="mb-2"><label class="form-label small" for="slug">Slug</label><input id="slug" name="slug" class="form-control" maxlength="180" value="{{ category.slug }}"></div>
+    <div class="mb-2"><label class="form-label small" for="parent">Danh mục cha</label>
+      <select id="parent" name="parent_id" class="form-select"><option value="">— Không có (danh mục gốc) —</option>
+        {% for c, depth in parents %}<option value="{{ c.id }}" {% if category.parent_id == c.id %}selected{% endif %}>{{ '— ' * depth }}{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="mb-3"><label class="form-label small" for="pos">Thứ tự hiển thị</label><input id="pos" name="position" type="number" value="{{ category.position }}" class="form-control"></div>
+    <button type="submit" class="btn btn-primary">Lưu</button>
+    <a href="{{ url_for('admin.categories') }}" class="btn btn-link">Hủy</a>
+  </form>
+</div>
+{% endblock %}

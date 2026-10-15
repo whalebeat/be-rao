@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+{% from "partials/macros.html" import pagination %}
+{% block title %}Tin nhắn liên hệ{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Tin nhắn liên hệ <span class="text-muted fs-6">({{ page.total }})</span></h1>
+{% with statuses = LEAD_STATUSES %}{% include "admin/_list_filter.html" %}{% endwith %}
+<div class="adm-card table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Khách hàng</th><th>SĐT</th><th>Nội dung</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
+    <tbody>
+      {% for m in page.items %}
+      <tr>
+        <td><a href="{{ url_for('admin.message_detail', message_id=m.id) }}">{{ m.name }}</a></td>
+        <td>{{ m.phone }}</td><td class="small">{{ m.message|truncate(80) }}</td>
+        <td><span class="badge text-bg-{{ 'danger' if m.status == 'moi' else 'secondary' }}">{{ LEAD_STATUSES.get(m.status) }}</span></td>
+        <td class="small text-muted text-nowrap">{{ m.created_at|vntime }}</td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="text-muted p-3">Chưa có tin nhắn.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ pagination(page) }}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ msg.name }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin.messages') }}" class="small">← Danh sách tin nhắn</a>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-3">
+  <h1 class="h4 mb-0">{{ msg.name }} <span class="text-muted fs-6">{{ msg.created_at|vntime }}</span></h1>
+  {% with statuses = LEAD_STATUSES, current = msg.status %}{% include "admin/_status_form.html" %}{% endwith %}
+</div>
+<div class="adm-card p-3" style="max-width:820px">
+  <table class="table table-striped mb-0">
+    <tbody>
+      <tr><th style="width:180px">SĐT</th><td><a href="tel:{{ msg.phone }}">{{ msg.phone }}</a> · <a href="https://zalo.me/{{ msg.phone.lstrip('+') }}" target="_blank" rel="noopener">Zalo</a></td></tr>
+      <tr><th>Email</th><td>{% if msg.email %}<a href="mailto:{{ msg.email }}">{{ msg.email }}</a>{% else %}—{% endif %}</td></tr>
+      <tr><th>Nội dung</th><td style="white-space:pre-line">{{ msg.message or '—' }}</td></tr>
+      <tr><th>Đồng ý xử lý dữ liệu</th><td class="small">{{ msg.consent }}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% if user.role == 'admin' %}
+<form method="post" action="{{ url_for('admin.message_delete', message_id=msg.id) }}" class="mt-3" data-confirm="Xóa vĩnh viễn tin nhắn này?">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Xóa tin nhắn</button>
+</form>
+{% endif %}
+{% endblock %}

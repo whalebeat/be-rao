@@ -1,0 +1,51 @@
+{% extends "admin/base.html" %}
+{% from "partials/macros.html" import pagination %}
+{% block title %}Sản phẩm{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">Sản phẩm <span class="text-muted fs-6">({{ page.total }})</span></h1>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('admin.product_import') }}" class="btn btn-outline-secondary btn-sm">Nhập / Xuất CSV</a>
+    <a href="{{ url_for('admin.product_new') }}" class="btn btn-primary btn-sm">+ Thêm sản phẩm</a>
+  </div>
+</div>
+<form method="get" class="adm-card p-2 mb-3 row g-2 mx-0">
+  <div class="col-md-4"><input name="q" value="{{ search }}" class="form-control form-control-sm" placeholder="Tìm theo tên hoặc SKU"></div>
+  <div class="col-md-3">
+    <select name="danh_muc" class="form-select form-select-sm"><option value="">Tất cả danh mục</option>
+      {% for c, depth in categories %}<option value="{{ c.id }}" {% if category_id == c.id %}selected{% endif %}>{{ '— ' * depth }}{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="thuong_hieu" class="form-select form-select-sm"><option value="">Tất cả thương hiệu</option>
+      {% for b in brands %}<option value="{{ b.id }}" {% if brand_id == b.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <select name="trang_thai" class="form-select form-select-sm">
+      <option value="">Mọi trạng thái</option><option value="hien" {% if status == 'hien' %}selected{% endif %}>Đang hiện</option><option value="an" {% if status == 'an' %}selected{% endif %}>Bản nháp / ẩn</option>
+    </select>
+  </div>
+  <div class="col-md-1"><button class="btn btn-sm btn-secondary w-100">Lọc</button></div>
+</form>
+<div class="adm-card table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th></th><th>Tên</th><th>SKU</th><th class="text-end">Giá</th><th>Danh mục</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody>
+      {% for p in page.items %}
+      <tr>
+        <td>{% if p.images %}<img src="{{ image_src(p.images[0]) }}" alt="" class="adm-thumb">{% endif %}</td>
+        <td><a href="{{ url_for('admin.product_edit', product_id=p.id) }}">{{ p.name }}</a>{% if p.featured %} <span class="badge text-bg-warning">Nổi bật</span>{% endif %}</td>
+        <td class="small">{{ p.sku }}</td>
+        <td class="text-end text-nowrap">{% if p.has_no_price %}<span class="text-danger">Liên hệ</span>{% else %}{{ p.price|vnd }}{% endif %}</td>
+        <td class="small">{{ p.categories|map(attribute='name')|join(', ') }}</td>
+        <td>{% if p.published %}<span class="badge text-bg-success">Hiện</span>{% else %}<span class="badge text-bg-secondary">Ẩn</span>{% endif %}
+            {% if not p.in_stock %}<span class="badge text-bg-light border">Hết hàng</span>{% endif %}</td>
+        <td class="text-nowrap"><a href="{{ url_for('public.product', slug=p.slug) }}" target="_blank" class="btn btn-sm btn-link">Xem ↗</a></td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="text-muted p-3">Không có sản phẩm.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ pagination(page) }}
+{% endblock %}

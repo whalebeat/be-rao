@@ -1,0 +1,9 @@
+{# Status changer. Needs `statuses` and `current`. #}
+<form method="post" class="d-flex gap-2 align-items-center">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="status" class="small text-muted text-nowrap">Trạng thái</label>
+  <select id="status" name="status" class="form-select form-select-sm">
+    {% for key, label in statuses.items() %}<option value="{{ key }}" {% if current == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm btn-primary">Lưu</button>
+</form>

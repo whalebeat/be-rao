@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import post_card, pagination %}
+{% set endpoint = 'public.project' if kind == 'project' else 'public.news' %}
+{% block title %}{{ title }}{% if page.page > 1 %} – Trang {{ page.page }}{% endif %}{% endblock %}
+{% block meta_description %}{{ title }} – {{ site_name }}{% endblock %}
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-4">{{ title }}</h1>
+  {% if page.items %}
+    <div class="row g-3">
+      {% for post in page.items %}<div class="col-sm-6 col-lg-4">{{ post_card(post, endpoint) }}</div>{% endfor %}
+    </div>
+    {{ pagination(page) }}
+  {% else %}
+    <p class="text-muted">Chưa có bài viết.</p>
+  {% endif %}
+</div>
+{% endblock %}

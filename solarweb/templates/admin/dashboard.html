@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+{% block title %}Tổng quan{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Tổng quan</h1>
+<div class="row g-3 mb-4">
+  {% for label, value, endpoint in [('Đơn hàng mới', new_orders, 'admin.orders'), ('Tư vấn mới', new_leads, 'admin.leads'),
+                                     ('Tin nhắn mới', counts.messages, 'admin.messages'), ('Sản phẩm', counts.products, 'admin.products')] %}
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for(endpoint) }}" class="adm-card d-block p-3 text-decoration-none text-reset">
+      <div class="small text-muted">{{ label }}</div><div class="adm-stat">{{ value }}</div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="adm-card p-3">
+      <h2 class="h6">Đơn hàng gần đây</h2>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% for o in orders %}
+          <tr><td><a href="{{ url_for('admin.order_detail', order_id=o.id) }}">{{ o.code }}</a></td><td>{{ o.name }}</td>
+            <td><span class="badge text-bg-{{ 'danger' if o.status == 'moi' else 'secondary' }}">{{ ORDER_STATUSES.get(o.status) }}</span></td>
+            <td class="small text-muted">{{ o.created_at|vntime }}</td></tr>
+          {% else %}<tr><td class="text-muted">Chưa có đơn hàng.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="adm-card p-3">
+      <h2 class="h6">Yêu cầu tư vấn gần đây</h2>
+      <table class="table table-sm mb-0">
+        <tbody>
+          {% for l in leads %}
+          <tr><td><a href="{{ url_for('admin.lead_detail', lead_id=l.id) }}">{{ l.name }}</a></td><td>{{ l.phone }}</td><td class="small">{{ l.system|truncate(40) }}</td>
+            <td class="small text-muted">{{ l.created_at|vntime }}</td></tr>
+          {% else %}<tr><td class="text-muted">Chưa có yêu cầu.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

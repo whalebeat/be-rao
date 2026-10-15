@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import post_card %}
+{% set is_project = post.kind == 'project' %}
+{% set endpoint = 'public.project' if is_project else 'public.news' %}
+{% block title %}{{ post.seo_title or post.title }}{% endblock %}
+{% block meta_description %}{{ post.seo_description or post.excerpt or post.title }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{% if post.thumbnail %}{{ media_url(post.thumbnail, external=True) }}{% endif %}{% endblock %}
+{% block content %}
+<div class="container">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('public.home') }}">Trang chủ</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('public.projects' if is_project else 'public.news_list') }}">{{ 'Dự án' if is_project else 'Tin tức' }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ post.title }}</li>
+    </ol>
+  </nav>
+  <article class="sw-article mx-auto">
+    <h1 class="h2">{{ post.title }}</h1>
+    <p class="small text-muted">{{ post.created_at|vntime('%d/%m/%Y') }}</p>
+    {% if post.thumbnail %}<img src="{{ media_url(post.thumbnail) }}" alt="{{ post.title }}" class="img-fluid rounded mb-4">{% endif %}
+    <div class="sw-content">{{ post.content|safe }}</div>
+  </article>
+  {% if others %}
+  <section class="mt-5">
+    <h2 class="sw-section-title">{{ 'Dự án khác' if is_project else 'Bài viết khác' }}</h2>
+    <div class="row g-3">{% for o in others %}<div class="col-md-4">{{ post_card(o, endpoint) }}</div>{% endfor %}</div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

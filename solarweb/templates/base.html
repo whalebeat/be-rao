@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% set page_title = self.title()|trim %}
+  {% set full_title = (page_title ~ ' | ' ~ site_name) if page_title else site_name %}
+  {% set description = self.meta_description()|trim %}
+  {% set canonical = (config.SITE_URL or request.url_root.rstrip('/')) ~ request.path %}
+  <title>{{ full_title }}</title>
+  {% if description %}<meta name="description" content="{{ description }}">{% endif %}
+  <link rel="canonical" href="{{ canonical }}">
+  {% if config.NOINDEX %}<meta name="robots" content="noindex, nofollow">{% endif %}
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:title" content="{{ full_title }}">
+  {% if description %}<meta property="og:description" content="{{ description }}">{% endif %}
+  <meta property="og:url" content="{{ canonical }}">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  {% set og_image = self.og_image()|trim %}
+  {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="sw-topbar small">
+    <div class="container d-flex justify-content-between gap-2 py-1">
+      <span class="d-none d-md-inline">Thiết bị điện mặt trời chính hãng – Tư vấn &amp; báo giá miễn phí</span>
+      {% if hotline %}<a href="tel:{{ digits_only(hotline) }}" class="text-reset text-decoration-none">📞 Hotline: <strong>{{ hotline }}</strong></a>{% endif %}
+    </div>
+  </div>
+  <header class="sw-header border-bottom bg-white">
+    <div class="container py-3 d-flex flex-wrap align-items-center gap-3">
+      <a href="{{ url_for('public.home') }}" class="sw-logo text-decoration-none me-auto me-lg-4">
+        <span class="sw-logo-mark">☀</span><span class="sw-logo-text">{{ site_name }}</span>
+      </a>
+      <form action="{{ url_for('public.products') }}" method="get" class="sw-search order-3 order-lg-2 flex-grow-1" role="search">
+        <div class="input-group">
+          <input type="search" name="q" class="form-control" placeholder="Tìm inverter, tấm pin, pin lưu trữ…" value="{{ request.args.get('q', '') if request.endpoint == 'public.products' else '' }}" aria-label="Tìm sản phẩm">
+          <button class="btn btn-sw" type="submit">Tìm</button>
+        </div>
+      </form>
+      <a href="{{ url_for('cart.view') }}" class="btn btn-outline-dark position-relative order-2 order-lg-3" aria-label="Giỏ hàng">
+        🛒 <span class="d-none d-sm-inline">Giỏ hàng</span>
+        {% if cart_count %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ cart_count }}</span>{% endif %}
+      </a>
+    </div>
+    <nav class="navbar navbar-expand-lg sw-nav py-0">
+      <div class="container">
+        <button class="navbar-toggler my-2" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menu">
+          <span class="navbar-toggler-icon"></span> Menu
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav">
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.home') }}">Trang chủ</a></li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="{{ url_for('public.products') }}" role="button" data-bs-toggle="dropdown" aria-expanded="false">Sản phẩm</a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{{ url_for('public.products') }}">Tất cả sản phẩm</a></li>
+                {% if menu_categories %}<li><hr class="dropdown-divider"></li>{% endif %}
+                {% for c in menu_categories %}
+                  <li><a class="dropdown-item fw-semibold" href="{{ url_for('public.category', slug=c.slug) }}">{{ c.name }}</a></li>
+                  {% for child in c.children|sort(attribute='name') %}
+                    <li><a class="dropdown-item ps-4" href="{{ url_for('public.category', slug=child.slug) }}">{{ child.name }}</a></li>
+                  {% endfor %}
+                {% endfor %}
+              </ul>
+            </li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.projects') }}">Dự án</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.news_list') }}">Tin tức</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.calculator') }}">Tính điện mặt trời</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.page', slug='gioi-thieu') }}">Giới thiệu</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('public.contact') }}">Liên hệ</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="py-4">
+    <div class="container">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+    </div>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="sw-footer pt-5 pb-4">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-5">
+          <div class="sw-logo mb-2"><span class="sw-logo-mark">☀</span><span class="sw-logo-text text-white">{{ site_name }}</span></div>
+          <p class="small mb-1">Cung cấp thiết bị và giải pháp điện mặt trời cho hộ gia đình, kinh doanh và nhà xưởng.</p>
+          {% set address = get_setting('address', '') %}
+          {% if address %}<p class="small mb-1">📍 {{ address }}</p>{% endif %}
+          {% if hotline %}<p class="small mb-0">📞 <a href="tel:{{ digits_only(hotline) }}">{{ hotline }}</a></p>{% endif %}
+        </div>
+        <div class="col-6 col-md-3">
+          <h2 class="h6 text-white">Sản phẩm</h2>
+          <ul class="list-unstyled small">
+            {% for c in menu_categories[:6] %}<li><a href="{{ url_for('public.category', slug=c.slug) }}">{{ c.name }}</a></li>{% endfor %}
+          </ul>
+        </div>
+        <div class="col-6 col-md-4">
+          <h2 class="h6 text-white">Thông tin</h2>
+          <ul class="list-unstyled small">
+            <li><a href="{{ url_for('public.page', slug='gioi-thieu') }}">Giới thiệu</a></li>
+            <li><a href="{{ url_for('public.page', slug='dich-vu') }}">Dịch vụ</a></li>
+            <li><a href="{{ url_for('public.page', slug='bao-hanh') }}">Bảo hành</a></li>
+            <li><a href="{{ url_for('public.page', slug='chinh-sach-bao-mat') }}">Chính sách bảo mật</a></li>
+            <li><a href="{{ url_for('public.contact') }}">Liên hệ</a></li>
+          </ul>
+        </div>
+      </div>
+      <hr class="border-secondary">
+      <p class="small mb-0">© {{ site_name }}</p>
+    </div>
+  </footer>
+
+  {# Floating Zalo / hotline buttons (solarweb-core.php) #}
+  {% set zalo_num = digits_only(zalo) %}{% set hotline_num = digits_only(hotline) %}
+  <div class="sw-contact-buttons">
+    {% if zalo_num %}<a class="sw-zalo" href="https://zalo.me/{{ zalo_num }}" target="_blank" rel="noopener" aria-label="Chat Zalo">Zalo</a>{% endif %}
+    {% if hotline_num %}<a class="sw-call" href="tel:{{ hotline_num }}" aria-label="Gọi hotline">{{ hotline_num }}</a>{% endif %}
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+{# Defined here only so child templates can fill them; they're rendered above through self.<name>() #}
+{% if false %}{% block title %}{% endblock %}{% block meta_description %}{% endblock %}{% block og_image %}{% endblock %}{% endif %}

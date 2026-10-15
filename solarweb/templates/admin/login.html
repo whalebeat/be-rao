@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}
+{% block title %}Đăng nhập{% endblock %}
+{% block content %}
+<div class="adm-card p-4 mx-auto mt-5" style="max-width:380px">
+  <h1 class="h4 mb-3">☀ {{ site_name }} – Quản trị</h1>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3"><label class="form-label" for="u">Tên đăng nhập</label><input id="u" name="username" class="form-control" required autocomplete="username" autofocus></div>
+    <div class="mb-3"><label class="form-label" for="p">Mật khẩu</label><input id="p" name="password" type="password" class="form-control" required autocomplete="current-password"></div>
+    <button type="submit" class="btn btn-primary w-100">Đăng nhập</button>
+  </form>
+</div>
+{% endblock %}

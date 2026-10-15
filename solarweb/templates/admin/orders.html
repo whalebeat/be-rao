@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% from "partials/macros.html" import pagination %}
+{% block title %}Đơn hàng{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Yêu cầu đặt hàng <span class="text-muted fs-6">({{ page.total }})</span></h1>
+{% with statuses = ORDER_STATUSES %}{% include "admin/_list_filter.html" %}{% endwith %}
+<div class="adm-card table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead><tr><th>Mã</th><th>Khách hàng</th><th>SĐT</th><th>Tỉnh/TP</th><th class="text-end">Tạm tính</th><th>Trạng thái</th><th>Ngày</th></tr></thead>
+    <tbody>
+      {% for o in page.items %}
+      <tr>
+        <td><a href="{{ url_for('admin.order_detail', order_id=o.id) }}">{{ o.code }}</a></td>
+        <td>{{ o.name }}</td><td>{{ o.phone }}</td><td>{{ o.city }}</td>
+        <td class="text-end text-nowrap">{{ o.total_known|vnd }}{% if o.has_contact_price %} <span class="text-danger small">+ LH</span>{% endif %}</td>
+        <td><span class="badge text-bg-{{ 'danger' if o.status == 'moi' else ('success' if o.status == 'hoan_tat' else 'secondary') }}">{{ ORDER_STATUSES.get(o.status) }}</span></td>
+        <td class="small text-muted text-nowrap">{{ o.created_at|vntime }}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="text-muted p-3">Chưa có đơn hàng.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{{ pagination(page) }}
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ intro.seo_title or intro.title if intro else 'Tính điện mặt trời' }}{% endblock %}
+{% block meta_description %}{{ (intro.seo_description or intro.excerpt) if intro and (intro.seo_description or intro.excerpt) else 'Tính công suất điện mặt trời theo hóa đơn tiền điện: số tấm pin, chi phí đầu tư, tiết kiệm hàng tháng và thời gian hoàn vốn.' }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='calculator.css') }}">{% endblock %}
+{% block content %}
+<div class="container">
+  <h1 class="h2 mb-3">{{ intro.title if intro else 'Tính điện mặt trời' }}</h1>
+  {% if intro and intro.content %}<div class="sw-content mb-4">{{ intro.content|safe }}</div>{% endif %}
+  <div class="swc" data-solarweb-calculator><noscript>Vui lòng bật JavaScript để dùng công cụ tính.</noscript></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.SOLARWEB_CALC = {{ calc_data|tojson }};</script>
+{% if calc_data.captcha %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>{% endif %}
+<script src="{{ url_for('static', filename='calculator.js') }}"></script>
+{% endblock %}

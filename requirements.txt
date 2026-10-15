@@ -5,3 +5,6 @@ Werkzeug==3.1.5
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 gunicorn==25.1.0
+# SolarWeb (/solar)
+pillow==12.3.0
+nh3==0.3.7

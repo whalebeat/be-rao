@@ -1,0 +1,19 @@
+{% extends "admin/base.html" %}
+{% block title %}Tính điện mặt trời{% endblock %}
+{% block content %}
+<h1 class="h4 mb-2">Tính điện mặt trời</h1>
+<p class="small text-muted" style="max-width:820px">Công cụ ở <a href="{{ url_for('public.calculator') }}" target="_blank">{{ url_for('public.calculator') }}</a>. Kết quả chỉ là ước tính; khách để lại SĐT sẽ hiện trong mục <a href="{{ url_for('admin.leads') }}">Yêu cầu tư vấn</a>. Giá trị không hợp lệ sẽ được thay bằng giá trị mặc định.</p>
+<form method="post" class="adm-card p-3" style="max-width:820px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% for section, fields in labels.items() %}
+    <h2 class="h6 mt-2">{{ section }}</h2>
+    {% for key, label in fields.items() %}
+      <div class="row g-2 align-items-center mb-2">
+        <label class="col-md-7 col-form-label col-form-label-sm" for="swc-{{ key }}">{{ label }}</label>
+        <div class="col-md-5"><input id="swc-{{ key }}" name="{{ key }}" class="form-control form-control-sm" value="{{ values[key] }}"></div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+  <button type="submit" class="btn btn-primary mt-2">Lưu</button>
+</form>
+{% endblock %}

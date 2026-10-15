@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import turnstile %}
+{% block title %}{{ post.seo_title or post.title if post else 'Liên hệ' }}{% endblock %}
+{% block meta_description %}Liên hệ {{ site_name }} để được tư vấn, khảo sát và báo giá hệ thống điện mặt trời.{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <h1 class="h2">{{ post.title if post else 'Liên hệ' }}</h1>
+      {% if post and post.content %}<div class="sw-content">{{ post.content|safe }}</div>{% endif %}
+      <ul class="list-unstyled">
+        {% if hotline %}<li class="mb-2">📞 Hotline: <a href="tel:{{ digits_only(hotline) }}">{{ hotline }}</a></li>{% endif %}
+        {% if zalo %}<li class="mb-2">💬 Zalo: <a href="https://zalo.me/{{ digits_only(zalo) }}" target="_blank" rel="noopener">{{ zalo }}</a></li>{% endif %}
+        {% set address = get_setting('address', '') %}{% if address %}<li class="mb-2">📍 {{ address }}</li>{% endif %}
+      </ul>
+    </div>
+    <div class="col-lg-6">
+      <form method="post" class="sw-form p-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2 class="h5 mb-3">Gửi yêu cầu tư vấn</h2>
+        <div class="mb-3"><label class="form-label" for="c-name">Họ tên *</label><input id="c-name" name="name" class="form-control" required maxlength="100" value="{{ form.get('name', '') }}"></div>
+        <div class="mb-3"><label class="form-label" for="c-phone">Số điện thoại / Zalo *</label><input id="c-phone" name="phone" type="tel" class="form-control" required value="{{ form.get('phone', '') }}"></div>
+        <div class="mb-3"><label class="form-label" for="c-email">Email</label><input id="c-email" name="email" type="email" class="form-control" value="{{ form.get('email', '') }}"></div>
+        <div class="mb-3"><label class="form-label" for="c-msg">Nội dung</label><textarea id="c-msg" name="message" rows="5" class="form-control" maxlength="3000" placeholder="Ví dụ: địa chỉ lắp đặt, tiền điện hàng tháng, loại mái…">{{ form.get('message', '') }}</textarea></div>
+        {# Honeypot: hidden from people, bots fill it in #}
+        <div class="sw-hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="consent" value="1" id="c-consent" required {% if form.get('consent') %}checked{% endif %}>
+          <label class="form-check-label small" for="c-consent">{{ consent }}{% if privacy %} <a href="{{ privacy }}" target="_blank">Chính sách bảo mật</a>{% endif %}</label>
+        </div>
+        {{ turnstile() }}
+        <button type="submit" class="btn btn-sw mt-2">Gửi yêu cầu</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

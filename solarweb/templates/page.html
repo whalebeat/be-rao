@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ post.seo_title or post.title }}{% endblock %}
+{% block meta_description %}{{ post.seo_description or post.excerpt or post.title }}{% endblock %}
+{% block content %}
+<div class="container">
+  <article class="sw-article mx-auto">
+    <h1 class="h2 mb-4">{{ post.title }}</h1>
+    <div class="sw-content">{{ post.content|safe }}</div>
+  </article>
+</div>
+{% endblock %}

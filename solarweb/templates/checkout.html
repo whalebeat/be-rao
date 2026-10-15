@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import turnstile %}
+{% block title %}Đặt hàng{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-4">Gửi yêu cầu đặt hàng</h1>
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <form method="post" class="sw-form p-4" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="o-name">Họ và tên *</label><input id="o-name" name="name" class="form-control" required maxlength="100" value="{{ form.name }}" autocomplete="name"></div>
+          <div class="col-md-6"><label class="form-label" for="o-phone">Số điện thoại *</label><input id="o-phone" name="phone" type="tel" class="form-control" required value="{{ form.phone }}" autocomplete="tel"></div>
+          <div class="col-12"><label class="form-label" for="o-address">Địa chỉ *</label><input id="o-address" name="address" class="form-control" required maxlength="300" value="{{ form.address }}" autocomplete="street-address"></div>
+          <div class="col-md-6"><label class="form-label" for="o-city">Tỉnh / Thành phố *</label><input id="o-city" name="city" class="form-control" required maxlength="100" value="{{ form.city }}" autocomplete="address-level1"></div>
+          <div class="col-md-6"><label class="form-label" for="o-email">Email (không bắt buộc)</label><input id="o-email" name="email" type="email" class="form-control" value="{{ form.email }}" autocomplete="email"></div>
+          <div class="col-12"><label class="form-label" for="o-note">Ghi chú</label><textarea id="o-note" name="note" rows="3" class="form-control" maxlength="2000" placeholder="Ví dụ: địa chỉ lắp đặt, công suất mong muốn, thời gian liên hệ…">{{ form.note }}</textarea></div>
+        </div>
+        <div class="sw-payment mt-3 p-3">
+          <strong>Thanh toán khi nhận hàng (COD)</strong>
+          <p class="small mb-0">Chúng tôi sẽ gọi xác nhận đơn, báo giá các sản phẩm "Liên hệ", phí vận chuyển và lắp đặt trước khi giao hàng.</p>
+        </div>
+        {{ turnstile() }}
+        <button type="submit" class="btn btn-sw btn-lg mt-3">Gửi yêu cầu đặt hàng</button>
+      </form>
+    </div>
+    <div class="col-lg-5">
+      <div class="sw-summary p-3">
+        <h2 class="h6">Đơn hàng của bạn</h2>
+        <ul class="list-unstyled small mb-3">
+          {% for product, qty, subtotal in lines %}
+          <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+            <span>{{ product.name }} × {{ qty }}</span>
+            <span class="text-nowrap">{% if subtotal is none %}<span class="sw-contact-price">Liên hệ</span>{% else %}{{ subtotal|vnd }}{% endif %}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="d-flex justify-content-between"><span>Tạm tính</span><strong>{{ total_known|vnd }}</strong></div>
+        {% if has_contact %}<p class="small text-muted mt-2 mb-0">+ các sản phẩm giá liên hệ</p>{% endif %}
+        <a href="{{ url_for('cart.view') }}" class="small d-inline-block mt-2">← Sửa giỏ hàng</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

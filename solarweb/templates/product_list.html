@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import product_card, pagination %}
+{% block title %}{{ title }}{% if page.page > 1 %} – Trang {{ page.page }}{% endif %}{% endblock %}
+{% block meta_description %}{{ description or (title ~ ' – ' ~ site_name) }}{% endblock %}
+{% block content %}
+<div class="container">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ url_for('public.home') }}">Trang chủ</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('public.products') }}">Sản phẩm</a></li>
+      {% if category %}
+        {% for parent in [category.parent] if category.parent %}<li class="breadcrumb-item"><a href="{{ url_for('public.category', slug=parent.slug) }}">{{ parent.name }}</a></li>{% endfor %}
+        <li class="breadcrumb-item active" aria-current="page">{{ category.name }}</li>
+      {% elif brand %}<li class="breadcrumb-item active" aria-current="page">{{ brand.name }}</li>{% endif %}
+    </ol>
+  </nav>
+  <div class="row g-4">
+    <aside class="col-lg-3">
+      <div class="sw-filter p-3">
+        <h2 class="h6">Danh mục</h2>
+        <ul class="list-unstyled small mb-3">
+          {% for c in menu_categories %}
+            <li><a href="{{ url_for('public.category', slug=c.slug) }}" class="{% if category and category.id == c.id %}fw-bold{% endif %}">{{ c.name }}</a>
+              {% if c.children %}<ul class="list-unstyled ps-3">
+                {% for child in c.children|sort(attribute='name') %}<li><a href="{{ url_for('public.category', slug=child.slug) }}" class="{% if category and category.id == child.id %}fw-bold{% endif %}">{{ child.name }}</a></li>{% endfor %}
+              </ul>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if brands %}
+        <h2 class="h6">Thương hiệu</h2>
+        <div class="d-flex flex-wrap gap-1">
+          {% for b in brands %}<a href="{{ url_for('public.brand', slug=b.slug) }}" class="badge {% if brand and brand.id == b.id %}text-bg-dark{% else %}text-bg-light border{% endif %} text-decoration-none">{{ b.name }}</a>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </aside>
+    <section class="col-lg-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h1 class="h3 mb-0">{{ title }}</h1>
+        <form method="get" class="d-flex gap-2 align-items-center">
+          {% if search %}<input type="hidden" name="q" value="{{ search }}">{% endif %}
+          <label for="sort" class="small text-muted text-nowrap">Sắp xếp</label>
+          <select id="sort" name="sap-xep" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for value, label in [('moi-nhat', 'Mới nhất'), ('gia-tang', 'Giá tăng dần'), ('gia-giam', 'Giá giảm dần'), ('ten', 'Tên A–Z')] %}
+              <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      {% if page.items %}
+        <p class="small text-muted">{{ page.total }} sản phẩm</p>
+        <div class="row g-3">
+          {% for p in page.items %}<div class="col-6 col-md-4">{{ product_card(p) }}</div>{% endfor %}
+        </div>
+        {{ pagination(page) }}
+      {% else %}
+        <p class="text-muted">Không tìm thấy sản phẩm phù hợp.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

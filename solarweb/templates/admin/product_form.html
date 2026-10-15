@@ -1,0 +1,122 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Thêm sản phẩm' if is_new else product.name }}{% endblock %}
+{% block head %}<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">{% endblock %}
+{% block content %}
+{% set selected_cats = product.categories|map(attribute='id')|list %}
+{% set selected_brands = product.brands|map(attribute='id')|list %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">{{ 'Thêm sản phẩm' if is_new else 'Sửa sản phẩm' }}</h1>
+  {% if not is_new %}<a href="{{ url_for('public.product', slug=product.slug) }}" target="_blank" class="btn btn-sm btn-outline-secondary">Xem trên website ↗</a>{% endif %}
+</div>
+<form method="post" enctype="multipart/form-data" id="product-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="adm-card p-3 mb-3">
+        <div class="mb-3"><label class="form-label" for="name">Tên sản phẩm *</label><input id="name" name="name" class="form-control" required maxlength="255" value="{{ product.name or '' }}" data-slug-source></div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6"><label class="form-label" for="sku">Mã SKU *</label><input id="sku" name="sku" class="form-control" required maxlength="100" value="{{ product.sku or '' }}"></div>
+          <div class="col-md-6"><label class="form-label" for="slug">Đường dẫn (slug)</label><input id="slug" name="slug" class="form-control" maxlength="180" value="{{ product.slug or '' }}" placeholder="tự tạo từ tên" data-slug-target></div>
+        </div>
+        <div class="mb-3"><label class="form-label" for="short">Mô tả ngắn</label><textarea id="short" name="short_description" rows="2" class="form-control" maxlength="1000">{{ product.short_description or '' }}</textarea></div>
+        <label class="form-label">Mô tả chi tiết</label>
+        <div class="adm-editor" data-editor="description">{{ (product.description or '')|safe }}</div>
+        <input type="hidden" name="description" id="description" value="{{ product.description or '' }}">
+      </div>
+
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Thông số kỹ thuật</h2>
+        <p class="small text-muted">Mỗi dòng là một thông số (vd. Công suất – 5 kW). Dòng "Hiện" sẽ có trong tab "Thông số kỹ thuật".</p>
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Tên thông số</th><th>Giá trị</th><th style="width:7rem">Hiện</th><th></th></tr></thead>
+          <tbody id="attr-rows">
+            {% for a in (product.attributes or [None]) %}
+            <tr class="row-item">
+              <td><input name="attr_name[]" class="form-control form-control-sm" value="{{ a.name if a else '' }}" maxlength="200"></td>
+              <td><input name="attr_value[]" class="form-control form-control-sm" value="{{ a.value if a else '' }}" maxlength="500"></td>
+              <td><select name="attr_visible[]" class="form-select form-select-sm"><option value="1">Hiện</option><option value="0" {% if a and not a.visible %}selected{% endif %}>Ẩn</option></select></td>
+              <td><button type="button" class="btn btn-sm btn-outline-danger remove-row" aria-label="Xóa dòng">✕</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-add-row="attr-rows">+ Thêm thông số</button>
+      </div>
+
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Hình ảnh</h2>
+        {% if product.images %}
+        <div class="d-flex flex-wrap gap-3 mb-3">
+          {% for img in product.images %}
+          <div class="adm-img-tile small">
+            <img src="{{ image_src(img) }}" alt="">
+            <div class="d-flex align-items-center gap-1 mt-1">
+              <label class="visually-hidden" for="pos-{{ img.id }}">Thứ tự</label>
+              <input id="pos-{{ img.id }}" type="number" name="image_pos_{{ img.id }}" value="{{ loop.index0 }}" class="form-control form-control-sm" style="width:4rem" title="Thứ tự (0 = ảnh chính)">
+              <label class="form-check-label"><input type="checkbox" name="image_delete" value="{{ img.id }}" class="form-check-input"> Xóa</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <label class="form-label" for="images">Thêm ảnh (JPEG, PNG, WebP – ảnh lớn sẽ được thu nhỏ còn 1600px)</label>
+        <input id="images" type="file" name="images" accept="image/jpeg,image/png,image/webp" multiple class="form-control">
+      </div>
+
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">SEO</h2>
+        <div class="mb-2"><label class="form-label small" for="seo_title">Tiêu đề SEO (trống = tên sản phẩm)</label><input id="seo_title" name="seo_title" class="form-control form-control-sm" maxlength="255" value="{{ product.seo_title or '' }}"></div>
+        <div><label class="form-label small" for="seo_desc">Mô tả SEO (trống = mô tả ngắn)</label><textarea id="seo_desc" name="seo_description" rows="2" class="form-control form-control-sm" maxlength="500">{{ product.seo_description or '' }}</textarea></div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="adm-card p-3 mb-3">
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="published" name="published" value="1" {% if product.published %}checked{% endif %}><label class="form-check-label" for="published">Hiện trên website</label></div>
+        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="featured" name="featured" value="1" {% if product.featured %}checked{% endif %}><label class="form-check-label" for="featured">Sản phẩm nổi bật</label></div>
+        <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="in_stock" name="in_stock" value="1" {% if product.in_stock %}checked{% endif %}><label class="form-check-label" for="in_stock">Còn hàng</label></div>
+        <button type="submit" class="btn btn-primary w-100">Lưu sản phẩm</button>
+      </div>
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Giá</h2>
+        <div class="mb-2"><label class="form-label small" for="regular_price">Giá bán (đ) – để trống = "Liên hệ"</label><input id="regular_price" name="regular_price" class="form-control" inputmode="numeric" value="{{ product.regular_price if product.regular_price is not none else '' }}"></div>
+        <div><label class="form-label small" for="sale_price">Giá khuyến mãi (đ)</label><input id="sale_price" name="sale_price" class="form-control" inputmode="numeric" value="{{ product.sale_price if product.sale_price is not none else '' }}"></div>
+      </div>
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Danh mục</h2>
+        <div style="max-height:220px;overflow:auto">
+          {% for c, depth in categories %}
+          <div class="form-check" style="margin-left:{{ depth * 1.2 }}rem"><input class="form-check-input" type="checkbox" name="categories" value="{{ c.id }}" id="cat-{{ c.id }}" {% if c.id in selected_cats %}checked{% endif %}><label class="form-check-label" for="cat-{{ c.id }}">{{ c.name }}</label></div>
+          {% else %}<p class="small text-muted mb-0">Chưa có danh mục. <a href="{{ url_for('admin.categories') }}">Thêm danh mục</a></p>{% endfor %}
+        </div>
+      </div>
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Thương hiệu</h2>
+        <div style="max-height:180px;overflow:auto">
+          {% for b in brands %}
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="brands" value="{{ b.id }}" id="brand-{{ b.id }}" {% if b.id in selected_brands %}checked{% endif %}><label class="form-check-label" for="brand-{{ b.id }}">{{ b.name }}</label></div>
+          {% else %}<p class="small text-muted mb-0">Chưa có thương hiệu. <a href="{{ url_for('admin.brands') }}">Thêm thương hiệu</a></p>{% endfor %}
+        </div>
+      </div>
+      <div class="adm-card p-3 mb-3">
+        <h2 class="h6">Datasheet (PDF)</h2>
+        {% if product.datasheet_media %}
+          <p class="small mb-1">Đã tải lên: <a href="{{ media_url(product.datasheet_media) }}" target="_blank">{{ product.datasheet_media.filename }}</a></p>
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="datasheet_remove" value="1" id="ds-remove"><label class="form-check-label small" for="ds-remove">Gỡ tệp đã tải lên</label></div>
+        {% endif %}
+        <label class="form-label small" for="ds-file">Tải tệp PDF lên (tối đa 10 MB)</label>
+        <input id="ds-file" type="file" name="datasheet_file" accept="application/pdf" class="form-control form-control-sm mb-2">
+        <label class="form-label small" for="ds-url">Hoặc dán đường dẫn PDF</label>
+        <input id="ds-url" name="datasheet_url" class="form-control form-control-sm" placeholder="https://…/datasheet.pdf" value="{{ product.datasheet_url or '' }}">
+      </div>
+    </div>
+  </div>
+</form>
+{% if not is_new %}
+<form method="post" action="{{ url_for('admin.product_delete', product_id=product.id) }}" data-confirm="Xóa sản phẩm này? Đơn hàng cũ vẫn giữ tên và giá sản phẩm." class="mt-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn btn-outline-danger btn-sm">Xóa sản phẩm</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>{% endblock %}

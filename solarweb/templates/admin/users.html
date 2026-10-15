@@ -1,0 +1,57 @@
+{% extends "admin/base.html" %}
+{% block title %}Người dùng{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Người dùng</h1>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <form method="post" class="adm-card p-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="h6">Thêm người dùng</h2>
+      <div class="mb-2"><label class="form-label small" for="nu">Tên đăng nhập</label><input id="nu" name="username" class="form-control" required maxlength="100" autocomplete="off"></div>
+      <div class="mb-2"><label class="form-label small" for="np">Mật khẩu tạm (ít nhất 8 ký tự)</label><input id="np" name="password" type="password" class="form-control" required minlength="8" autocomplete="new-password"></div>
+      <div class="mb-3"><label class="form-label small" for="nr">Vai trò</label>
+        <select id="nr" name="role" class="form-select">{% for key, label in ROLES.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select>
+        <div class="form-text">Nhân viên: sản phẩm, đơn hàng, tư vấn, nội dung. Quản trị viên: thêm cài đặt và người dùng.</div>
+      </div>
+      <button class="btn btn-primary">Tạo</button>
+    </form>
+  </div>
+  <div class="col-lg-8">
+    <div class="adm-card table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Đặt lại mật khẩu</th><th></th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.username }}{% if u.id == user.id %} <span class="badge text-bg-info">bạn</span>{% endif %}{% if u.must_change_password %} <span class="badge text-bg-light border">chờ đổi MK</span>{% endif %}</td>
+            <td>
+              {% if u.id == user.id %}{{ ROLES.get(u.role) }}{% else %}
+              <form method="post" action="{{ url_for('admin.user_update', user_id=u.id) }}" class="d-flex gap-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="role">
+                <select name="role" class="form-select form-select-sm" aria-label="Vai trò">{% for key, label in ROLES.items() %}<option value="{{ key }}" {% if u.role == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                <button class="btn btn-sm btn-outline-secondary">Lưu</button>
+              </form>{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin.user_update', user_id=u.id) }}" class="d-flex gap-1">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="password">
+                <input name="password" type="password" class="form-control form-control-sm" placeholder="Mật khẩu mới" minlength="8" required autocomplete="new-password" aria-label="Mật khẩu mới">
+                <button class="btn btn-sm btn-outline-warning">Đặt</button>
+              </form>
+            </td>
+            <td class="text-end">
+              {% if u.id != user.id %}
+              <form method="post" action="{{ url_for('admin.user_update', user_id=u.id) }}" data-confirm="Xóa người dùng này?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delete">
+                <button class="btn btn-sm btn-outline-danger">Xóa</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

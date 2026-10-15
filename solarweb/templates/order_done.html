@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Đã nhận yêu cầu đặt hàng{% endblock %}
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="sw-form p-4 mx-auto" style="max-width:640px">
+    <h1 class="h3 text-success">✓ Đã nhận yêu cầu đặt hàng</h1>
+    <p>Cảm ơn {{ order.name }}! Mã đơn của bạn là <strong>{{ order.code }}</strong>. Chúng tôi sẽ gọi số <strong>{{ order.phone }}</strong> để xác nhận trong giờ làm việc.</p>
+    <ul class="list-unstyled small">
+      {% for item in order.items %}
+      <li class="d-flex justify-content-between border-bottom py-1"><span>{{ item.name }} × {{ item.qty }}</span>
+        <span>{% if item.subtotal is none %}<span class="sw-contact-price">Liên hệ</span>{% else %}{{ item.subtotal|vnd }}{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+    <p class="mb-3">Tạm tính: <strong>{{ order.total_known|vnd }}</strong>{% if order.has_contact_price %} + các sản phẩm giá liên hệ{% endif %}</p>
+    <a href="{{ url_for('public.products') }}" class="btn btn-sw">Tiếp tục xem sản phẩm</a>
+  </div>
+</div>
+{% endblock %}
